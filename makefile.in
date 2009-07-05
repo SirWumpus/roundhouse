@@ -1,0 +1,173 @@
+#
+# @package_copyright@
+#
+# @configure_input@
+#
+
+.POSIX :
+
+TARNAME 	= @PACKAGE_TARNAME@
+VERSION		= @PACKAGE_VERSION@
+
+########################################################################
+### Pick one that best suits your system.
+########################################################################
+
+RUN_USER	= @enable_run_user@
+RUN_GROUP	= @enable_run_group@
+prefix		= @prefix@
+exec_prefix	= @exec_prefix@
+PROGRAM		= @executable@
+
+########################################################################
+### No further configuration beyond this point.
+########################################################################
+
+.SUFFIXES :
+A = .@LIBEXT@
+O = .@OBJEXT@
+E = @EXEEXT@
+
+#
+# Paths for supporting headers and libraries.
+#
+top_srcdir	= @top_srcdir@
+abs_top_srcdir 	= @top_srcdir@
+SNERT_TARDIR	= @rel_tardir@
+SNERT_INCDIR	= @rel_incdir@
+SNERT_LIBDIR	= @rel_libdir@
+
+TARFILE	= ${TARNAME}-${VERSION}.tar.gz
+
+CC	= @CC@
+CC_E	= @CC_E@
+CC_O	= @CC_O@
+CFLAGS	= @CFLAGS@
+LDFLAGS	= @LDFLAGS@
+LIBS	= @LIBS@
+
+#W32_CFLAGS	= -DNDEBUG -O2 -s -mno-cygwin -mwindows
+W32_CFLAGS	= -mno-cygwin -mwindows
+#W32_LDFLAGS	= -Wl,--heap,131072,--stack,32768
+
+ARCHIVE	= @ARCHIVE@
+COMPILE	= @COMPILE@
+RANLIB	= @RANLIB@
+MD5SUM	= @MD5SUM@
+AUTOCONF= @AUTOCONF@
+TAR_I	= @TAR_I@
+
+_BUILD=`cat BUILD_ID.TXT`
+
+########################################################################
+### No further configuration beyond this point.
+########################################################################
+
+.SUFFIXES :
+O = .@OBJEXT@
+E = @EXEEXT@
+.SUFFIXES : .c $O $E
+
+build : ${TARNAME}$E
+	@echo
+	@echo '***************************************************************'
+	@echo build `cat BUILD_ID.TXT` DONE
+	@echo '***************************************************************'
+	@echo
+
+build-w32 : ${TARNAME}.exe
+	@echo
+	@echo '***************************************************************'
+	@echo build-w32 `cat BUILD_ID.TXT` DONE
+	@echo '***************************************************************'
+	@echo
+
+clean : 
+	-rm -rf autom4te.cache configure.lineno *.log *.o *.obj ${TARNAME}$E *.exe
+	@echo
+	@echo '***************************************************************'
+	@echo clean DONE
+	@echo '***************************************************************'
+	@echo
+
+distclean : 
+	-rm -rf autom4te.cache configure.lineno *.log *.o *.obj
+	-rm -f config.status config.h.in config.h ${TARNAME}$E ${TARNAME}-w32.exe
+	-rm -rf makefile examples
+	@echo
+	@echo '***************************************************************'
+	@echo distclean `pwd` DONE
+	@echo '***************************************************************'
+	@echo
+
+strip: build
+	strip ${TARNAME}$E
+
+next-id: 
+	expr `cat BUILD_ID.TXT` + 1 >BUILD_ID.TXT
+
+install: build install.sh
+	sh install.sh
+
+install.sh: install.sh.in config.status
+
+${TARNAME}: BUILD_ID.TXT ${TARNAME}.c 
+	$(CC) -D_BUILD=$(_BUILD) -D_BUILD_STRING='"'$(_BUILD)'"' \
+	${DEFINES} $(CFLAGS) $(LDFLAGS) $(CC_E)${TARNAME} ${TARNAME}.c $(LIBS)
+
+# Build native Windows app. using gcc under Cygwin, without cygwin1.dll.
+#
+# 	-s		strip, no symbols
+#	-mno-cygwin	native windows console app
+#	-mwindows	native windows gui app
+#	-lws2_32	WinSock2 library
+#	-lwsock32	WinSock library
+#	-Wl,--subsystem,windows,-e,_mainCRTStartup = -mwindows
+#	-Wl,--heap,1024,--stack,4096
+#
+# NOTE this produces smaller code than Borland C++ 5.5 command line tools.
+#
+${TARNAME}.exe: BUILD_ID.TXT ${TARNAME}.c 
+	gcc ${DEFINES} ${CFLAGS} -mno-cygwin -mwindows ${LDFLAGS} ${W32_CFLAGS} ${W32_LDFLAGS} -o ${TARNAME}.exe ${TARNAME}.c ${LIBS}
+
+configure: aclocal.m4 configure.in
+	${AUTOCONF} -f
+
+config.status : configure
+	./configure
+
+doc/manual.shtml: config.status manual.shtml.in
+	./config.status doc/manual.shtml
+	
+makefile: makefile.in config.status
+	./config.status makefile
+        
+pack: next-id tar
+
+list:
+	tar -ztf ${SNERT_TARDIR}/${TARFILE}
+
+tar: doc/manual.shtml
+	@echo
+	@echo '***************************************************************'
+	@echo
+	-rm -rf $(SNERT_TARDIR)/$(TARFILE) ${TARNAME}.md5 autom4te.cache configure.lineno
+	echo '${VERSION}.'`cat BUILD_ID.TXT` >VERSION.TXT
+	echo '${TARNAME}-${VERSION}.tar.gz' >FILE.TXT
+	-strip ${TARNAME}-w32.exe
+	tar -C ${SNERT_TARDIR} ${TAR_I} MANIFEST.TXT -zcf ${SNERT_TARDIR}/${TARFILE}
+	@echo
+	@echo '***************************************************************'
+	@cd ${SNERT_TARDIR}; ${MD5SUM} ${TARFILE} | tee com/snert/src/${TARNAME}/${TARNAME}.md5
+	@echo '***************************************************************'
+	@cd $(SNERT_TARDIR); wc -c $(TARFILE)
+	@echo '***************************************************************'
+	@echo
+
+predefines:
+	gcc  -dM -E -xc /dev/null >gcc.txt
+	
+#	gcc  -mno-cygwin -dM -E -xc /dev/null >gcc-mno-cygwin.txt
+#	gcc  -mwin32 -dM -E -xc /dev/null >gcc-mwin32.txt
+
+

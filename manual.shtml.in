@@ -1,0 +1,447 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN">
+<!-- $OpenBSD$ -->
+<html>
+<head>
+<title>
+SnertSoft - @PACKAGE_NAME@/@PACKAGE_VERSION@ (beta) for Sendmail
+</title>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1" />
+<meta name="keywords" content="SMTP session multiplexer multiplexor data stream splitter roundhouse" />
+<meta name="description" content="An SMTP multiplexer, which takes the input from an SMTP client connection and copies it to one or more SMTP servers." />
+<link rel="stylesheet" type="text/css" href="./style.css" />
+<script language="JavaScript" type="text/javascript" src="./mailto.js"></script>
+</head>
+
+<body>
+<div align="center">
+<table cellpadding="0" cellspacing="0" border="0" width="700" style="padding: 0px 10px 0px 10px;">
+<tr><td>
+
+<a href="http://www.snertsoft.com/">
+<img alt="SnertSoft: We Serve Your Server" src="Img/logo-300x74.png" width="300" height="74" border="0" /></a>
+
+<div align="center">
+<h1 class="title">
+@PACKAGE_NAME@/@PACKAGE_VERSION@ (beta)
+<br/><span class="large">&laquo;An SMTP Multiplexer&raquo;</span>
+</h1>
+<br/>
+<a href="#">Description &amp; Usage</a> &deg;
+<a href="#Installation">Installation &amp; Notes</a> &deg;
+<a href="#License">License &amp; Support</a>
+</div>
+
+<br>
+<blockquote>
+<table border="0" cellspacing="0" cellpadding="2" width="100%">
+<tr>
+	<td valign="top">
+		<br/>
+		A roundhouse is a maintenance facility used by railroads. Roundhouses
+		are the large, circular or semicircular structures that are located
+		surrounding or adjacent to turntables. The roundhouse in a railroad
+		yard is typically where steam locomotives were stored when they
+		weren't in use.
+
+		<p class="small">-
+		<a href="http://www.answers.com/roundhouse&r=67">
+		answers.com</a>
+		</p>
+	</td>
+	<td>&nbsp;&nbsp;&nbsp;</td>
+	<td><img src="Img/Locomotives-Roundhouse-265x204.png" width="265" height="204" border="1"></td>
+</tr>
+</table>
+</blockquote>
+
+<a name="Description"></a>
+<h3>Description</h3>
+
+<p>This is an SMTP multiplexer, which takes the input from an SMTP client connection
+and copies it to one or more SMTP servers. 
+Intended as means to debug and test different mail server configurations
+using a production mail server's live data stream.
+</p>
+
+<a name="Usage"></a>
+<h3>Usage</h3>
+
+<blockquote style="text-align: left;">
+<code>@PACKAGE_NAME@</code>
+<nobr>[<span class="syntax">-avw</span>]</nobr>
+<nobr>[<span class="syntax">-g</span> <span class="param">group</span>]</nobr>
+<nobr>[<span class="syntax">-p</span> <span class="param">port</span>]</nobr>
+<nobr>[<span class="syntax">-t</span> <span class="param">timeout</span>]</nobr>
+<nobr>[<span class="syntax">-u</span> <span class="param">user</span>]</nobr>
+<span class="param">server ...</span>
+
+</blockquote>
+
+<dl>
+<a name="DaemonMode"></a>
+<dt><span class="syntax">-a</span></dt>
+<dd>Run as a foreground application and log to standard error.
+The default is to start as a daemon or service in the background.
+</dd>
+
+<a name="RunGroup"></a>
+<dt><span class="syntax">-g</span> <span class="param">group</span></dt>
+<dd>Run as this group. Only root can specify this. Ignored on Windows.
+</dd>
+
+<a name="ServerPort"></a>
+<dt><span class="syntax">-p</span> <span class="param">port</span></dt>
+<dd>The port the server listens on. The default is 25.
+</dd>
+
+<a name="SocketTimeout"></a>
+<dt><span class="syntax">-t</span> <span class="param">timeout</span></dt>
+<dd>The client I/O timeout in seconds, 0 for indefinite. The default is 300 seconds.
+This value is also used for the SMTP server I/O timeout divided by the number of
+servers specified.
+</dd>
+
+<a name="RunUser"></a>
+<dt><span class="syntax">-u</span> <span class="param">user</span></dt>
+<dd>Run as this user. Only root can specify this. Ignored on Windows (for now).
+</dd>
+
+<a name="Debug"></a>
+<dt><span class="syntax">-v</span></dt>
+<dd>Enable verbose debug log messages. 
+<!-- As a Windows service, this will log lots of information in the Windows' Events log. -->
+</dd>
+
+<a name="Windows"></a>
+<dt><span class="syntax">-w</span></dt>
+<dd>Toggle add/remove Windows service. For Unix this is a no-op.
+</dd>
+
+<dt><span class="syntax">server ...</span></dt>
+<dd>
+One or more SMTP servers specified as a unix domain socket path or as a host[,port] specifier.
+The first server specified is the primary SMTP server used exclusively for STARTTLS connections.
+</dd>
+
+</dl>
+
+
+<a name="Installation"></a>
+<div align="center">
+<br/>
+<a href="#">Description &amp; Usage</a> &deg;
+<a href="#Installation">Installation &amp; Notes</a> &deg;
+<a href="#License">License &amp; Support</a>
+</div>
+
+<h3>Installation</h3>
+<ol>
+<li><p>
+Download:
+</p>
+
+<blockquote>
+<table border="0" cellspacing="0" cellpadding="2" width="100%">
+<tr>
+	<td class="tline bline"><a href="http://www.snertsoft.com/download/@PACKAGE_NAME@-@PACKAGE_VERSION@.tar.gz">@PACKAGE_NAME@/@PACKAGE_VERSION@</a></td>
+	<td class="tline bline"><a href="@PACKAGE_NAME@.md5">md5sum</a></td>
+	<td class="tline bline"><a href="CHANGES.TXT">Change Log</a></td>
+</tr>
+<tr>
+	<td class="bline"><a href="http://www.snertsoft.com/download/libsnert-current.tar.gz">LibSnert</a></td>
+	<td class="bline"><a href="@PACKAGE_NAME@.md5">md5sum</a></td>
+	<td class="bline"><a href="CHANGES-LIBSNERT.TXT">Change Log</a></td>
+</tr>
+</table>
+</blockquote>
+</li>
+
+</ol>
+
+
+<a name="Notes"></a>
+<h3>Notes</h3>
+
+<ul>
+<li><p>
+Currently tested platforms:
+</p>
+<blockquote>
+<code>Cobalt Qube 1 with Linux RH 5.1 (mips 2.0.34 kernel)</code>;
+<code>Windows XP Pro SP2</code>;
+</blockquote>
+</li>
+
+<li><p>
+When using Roundhouse on the same server as two or more Sendmail daemons,
+each Sendmail instance must be listening on a port other than 25, which 
+Roundhouse will be listening on. Either modify each daemon's sendmail.mc/cf
+file or specify the command line option -ODaemonPortOptions=Port=NNN. For example:
+</p>
+<blockquote><pre>
+	# sendmail -ODaemonPortOptions=Port=26
+	# sendmail -ODaemonPortOptions=Port=27	
+</pre></blockquote>
+<p>
+Then start Roundhouse to multiplex to the two local Sendmail daemons:
+</p>
+<blockquote><pre>
+	# roundhouse 127.0.0.1:26 ::1,27 other.host.example.com
+</pre></blockquote>
+<p>
+Note that Roundhouse supports IPv6 addresses, but in order to distinguish
+between the address and the port, a comma or other punctuation character
+must be used instead of a colon. 
+</p>
+</li>
+
+<li><p>
+Roundhouse does not currently multiplex STARTTLS sessions. Instead
+it forwards the STARTTLS and the remainder of the input stream to the first
+SMTP server in the server list. This should be your primary SMTP server.
+</p>
+
+<li><p>
+Roundhouse supports AUTH PLAIN and AUTH LOGIN. An AUTH LOGIN is converted
+to an AUTH PLAIN before being forwarded to the SMTP server list.
+</li>
+
+</ul>
+
+<a name="License"></a>
+<div align="center">
+<br/>
+<a href="#">Description &amp; Usage</a> &deg;
+<a href="#Installation">Installation &amp; Notes</a> &deg;
+<a href="#License">License &amp; Support</a>
+</div>
+
+<!-- License Agreement -->
+
+<h3>License Agreement 1.4</h3>
+<p>
+SNERTSOFT IS WILLING TO LICENSE THE SOFTWARE IDENTIFIED ABOVE TO YOU
+ONLY UPON THE CONDITION THAT YOU ACCEPT ALL OF THE TERMS CONTAINED
+IN THIS LICENSE AGREEMENT. PLEASE READ THE AGREEMENT CAREFULLY. BY
+DOWNLOADING OR INSTALLING THIS SOFTWARE, YOU ACCEPT THE TERMS OF THE
+AGREEMENT.
+</p>
+<ol>
+<li><h4>Definitions</h4>
+	<ol>
+	<li><p>
+	``Package'' means the identified above in source and/or binary
+	form, any other machine readable materials provided (including,
+	but not limited to documentation, sample files, data files),
+	any updates or error corrections, and its derivative works.
+	</p></li>
+	<li><p>
+    ``Private Individual'' means an individual using the Package for
+     personal, private, and non-commercial use only.
+	</p></li>
+	<li><p>
+    ``Organisation'' means a legal entity or an individual that does
+     not qualify as a Private Individual defined above.
+	</p></li>
+	<li><p>
+    ``You'' (or ``Your'') means a Private Individual or Organisation
+     exercising rights under, and complying with all of the terms of,
+     this License or a future version of this License issued under
+     Section 5.1.  For legal entities, ``You'' includes any entity
+     which controls, is controlled by, or is under common control with
+     You.  For purposes of this definition,``control'' means (a) the
+     power, direct or indirect, to cause the direction or management
+     of such entity, whether by contract or otherwise, or (b)
+     ownership of more than fifty percent (50%) of the outstanding
+     shares or beneficial ownership of such entity.
+	</p></li>
+	<li><p>
+	The Package is an original work written by Anthony C. Howe,
+	hereto referred to as the ``Author''.
+	</p></li>
+	</ol>
+</li>
+ 
+<li><h4>License To Use</h4>
+	<ol>
+	<li><p>
+	If You are a Private Individual and so
+     benefited from a reduced purchase price, then You may only
+     compile, install, and use this Package, with or without private
+     modifications, exclusively on a single machine You legally own or
+     rent from a third party, provided You retain this notice, the Author's copyright
+     notice, any and all license control methods (<a href="#License_Control">see below</a>), and any
+     links within the Package back to the most current online versions
+     of this License and Disclaimer.
+	</p></li>
+	<li><p>
+    Otherwise if You have paid the full purchase price, then You may
+     compile, install, and use this Package, with or without private
+     modifications, exclusively on machines You legally own or rent from a third party,
+     provided You retain this notice, the Author's copyright notice,
+     any and all license control methods (<a href="#License_Control">see below</a>), and any links
+     within the Package back to the most current online versions of
+     this License and Disclaimer.
+	</p></li>
+	<li><p>
+You may copy, share, distribute, modify, and create derivative
+works from the user manuals and any related documentation
+solely for Your internal business purposes, such as in-house
+documentation, training manuals, or reference material.
+	</p></li>
+	</ol>
+</li>
+
+
+<li><h4>Restrictions</h4>
+	<ol>
+	<li><p>
+Redistribution, including but not limited to books, CDROMS,
+download mirrors, floppy diskettes, hard disks, hardcopy print
+outs, online archives, solid state disks, streaming tapes, or
+other current or future forms of storage or communication media
+of the Package, with or without modifications, including any
+and all derivative works such as source patches, binaries,
+binary patches, or similar is expressly forbidden without prior
+written permission in hardcopy (letter or fax) signed and dated
+by the Author.
+	</p></li>
+	<li><p>
+
+It is expressly forbidden for You to use the Package, in whole
+or in part, in any other software, except those designated by
+the Author.
+	</p></li>
+	<li><p>
+
+It is expressly forbidden for You to use the Package to develop
+any software or other technology having the same primary
+function as the Package, including but not limited to using the
+Package in any development or test procedure that seeks to
+develop like software or other technology, or determine if such
+software or other technology performs in a similar manner as
+the Package.
+	</p></li>
+	<li><p>
+
+You may not sell, rent, lease, or transfer the Package to third 
+parties without prior written permission in hardcopy (letter or fax)
+signed and dated by the Author.
+	</p></li>
+	</ol>
+</li>
+
+
+<li><h4>Termination</h4>
+	<ol>
+	<li><p>
+This Agreement is effective until terminated. You may
+terminate this Agreement at any time by destroying all copies
+of the Package. This Agreement will terminate immediately without
+notice from the Author if You fail to comply with any provision
+of this Agreement. Either party may terminate this Agreement
+immediately should any portion of the Package become, or in
+either party's opinion be likely to become, the subject of a
+claim of infringement of any intellectual property right. Upon
+Termination, You must destroy all copies of the Package.
+	</p></li>
+	</ol>
+</li>
+
+
+<li><h4>Versions Of The License</h4>
+	<ol>
+	<li><p>
+New Versions. The Author may publish revised and/or new
+versions of the License from time to time. Each version will
+be given a distinguishing version number.
+	</p></li>
+	<li><p>
+
+Effect of New Versions. Once a version of the Package has been
+published under a particular version of the License, You may
+always continue to use it under the terms of that License
+version. You may also choose to use such Package under the
+terms of any subsequent version of the License published by the
+Author. No one other than the Author has the right to modify
+the terms applicable to the Package created under this License.
+	</p></li>
+	</ol>
+</li>
+</ol>
+
+
+<h3>Disclaimer</h3>
+
+<p>
+THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESSED OR IMPLIED
+WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO WAY SHALL THE AUTHOR OR LICENSEE BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+</p>
+
+<a name="License_Control"></a>
+<h3>License Control</h3>
+<p>
+The Package may use one or more license control methods including, but
+not limited to, license key activation, periodic reporting of Package
+details and IP address of installation to SnertSoft, remote license
+verification by SnertSoft, or other future technical means. Any
+information reported to or gathered by SnertSoft shall remain strictly
+confidential and the private property of SnertSoft. Under no
+circumstances will SnertSoft resell or release this information to third
+parties, unless demanded by court order.
+</p>
+
+<a name="Support"></a>
+<h3>Support</h3>
+
+<p>
+Support is only provided for the Author's original Package. Priority 
+support can be purchased. Free support is limited, based on the Author's
+availability, though enhancements requests and problem reports are welcome. 
+A community mailing list is available; please refer to 
+<a href="http://www.snertsoft.com/">SnertSoft</a> web site Support area for details.
+</p>
+
+<!-- end License Agreement -->
+
+<a name="Gifts"></a>
+<h3>Gifts</h3>
+
+<p>
+Gifts from the author's <a href="http://www.amazon.com/">Amazon US</a> wishlist (search by mail address &lt;achowe
+at snert dot com&gt;) are welcomed for the continued encouragement, moral support, and ego pumping needed to work in
+foreign non-english speaking lands.
+</p>
+
+<div align="center">
+<br/>
+<a href="#">Description &amp; Usage</a> &deg;
+<a href="#Installation">Installation &amp; Notes</a> &deg;
+<a href="#License">License &amp; Support</a>
+</div>
+
+<!-- copyright -->
+<p class="copyright" style="text-align: center;">
+<nobr>@package_copyright@</nobr>
+</p>
+<!--end copyright-->
+
+<p class="small" style="text-align: center;">
+<!--#include virtual="/cgi-bin/counter.cgi/sendmail/@PACKAGE_NAME@/counter.dat" -->
+train spotters since 23 October 2005
+</p>
+
+</td></tr>
+</table>
+</div>
+</body>
+</html>

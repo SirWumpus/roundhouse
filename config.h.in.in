@@ -1,0 +1,33 @@
+/*
+ * config.h
+ *
+ * Copyright 2005 by Anthony Howe. All rights reserved.
+ */
+
+#ifndef __config_h__
+#define __config_h__	1
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#undef _NAME
+#undef _MAJOR
+#undef _MINOR
+#undef _AUTHOR
+#undef _VERSION
+#undef _COPYRIGHT
+#undef _PLATFORM
+
+#ifndef __@platform@__
+#define __@platform@__		1	
+#endif
+
+#undef NDEBUG
+#undef ENABLE_FORK
+
+#ifdef  __cplusplus
+}
+#endif
+
+#endif /* __config_h__ */

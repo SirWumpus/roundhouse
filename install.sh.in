@@ -1,0 +1,205 @@
+#!/bin/sh
+#
+# @package_copyright@
+#
+# @configure_input@
+#
+# $OpenBSD$
+# $custom$
+#
+
+prefix="@prefix@"
+exec_prefix="@exec_prefix@"
+libexecdir="@libexecdir@"
+sbindir="@sbindir@"
+datadir="@datadir@"
+USER="@enable_run_user@"
+GROUP="@enable_run_group@"
+TARNAME='@PACKAGE_TARNAME@'
+INSTALL=install
+INSTALL_O='-o'
+
+UNAME=`uname`
+
+if id | grep 'uid=0' >/dev/null ; then
+	:
+else
+	echo
+	echo "You must be root to install this software."
+	echo
+	exit 1
+fi
+
+unalias hasCommand >/dev/null 2>&1
+hasCommand()
+{
+	case $UNAME in
+	Linux|OpenBSD|FreeBSD)
+		which "$1"
+		return $?
+		;;
+	*)
+		# SunOS which(1) always returns 0 it would seem, even if
+		# the command does not exist. Linux and OpenBSD return a
+		# false value when the command is not found.
+		if which $1 | grep "no $1 in" >/dev/null ; then
+			return 1
+		fi
+
+		return 0
+	esac
+
+	return 1
+}
+
+if test -d $libexecdir -a $UNAME != 'Linux' ; then
+	program=$libexecdir/$TARNAME
+else
+	# Linux tends not to come with a /usr/local/libexec and the
+	# FHS is silent about it. They prefer to put system daemons
+	# in sbin, unlike BSD systems that prefer libexec. A milter
+	# is a daemon consulted by sendmail systems.
+	program=$sbindir/$TARNAME
+fi
+
+# Always use this location. Linux FHS is silent about it. OpenBSD favours it.
+examples=$datadir/examples/$TARNAME
+doc=$datadir/doc/$TARNAME
+
+# Find location of common startup script directories...
+if test -d /etc/init.d ; then
+	# Debian Linux
+	startup_script="/etc/init.d/$TARNAME"
+elif test -d /etc/rc.d/init.d ; then
+	# Older Linux, System V structure?	
+	startup_script="/etc/rc.d/init.d/$TARNAME"
+elif test -d /usr/local/etc/rc.d ; then
+	# FreeBSD
+	startup_script="/usr/local/etc/rc.d/$TARNAME.sh"
+else
+	# OpenBSD policy is for root to install startup scripts by hand.
+	startup_script='NO'
+fi
+
+if test $UNAME = 'SunOS' ; then
+	# There are two different install tools. 
+	if test -x /usr/ucb/install ; then
+		INSTALL=/usr/ucb/install
+		INSTALL_O='-o'
+	elif test -x /usr/sbin/install ; then
+		INSTALL=/usr/sbin/install
+		INSTALL_O='-u'
+	fi
+fi
+
+echo
+if test $startup_script = NO ; then
+	:
+elif test -f $startup_script ; then
+	echo "You already have a startup script installed:"
+	echo
+	echo "  $startup_script"
+	echo
+
+	if cmp -s $startup_script examples/startup.sh ; then
+		echo "And its identical to the current distributiuon."
+		startup_script='NO'
+	else
+		while true ; do
+			echo -n "Shall I show you the differences against the new one? [n] "
+			read yn
+			if test ${yn:=n} = 'n' -o ${yn} = 'y' ; then
+				break;
+			fi		
+		done
+
+		if test "X$yn" = 'Xy' ; then
+			diff -u $startup_script examples/startup.sh | more
+		fi
+
+		echo
+
+		while true ; do
+			echo -n "Shall I replace the old startup script? [n] "
+			read yn
+			if test ${yn:=n} = 'n' -o ${yn} = 'y' ; then
+				break;
+			fi		
+		done
+
+		if test "X$yn" = 'Xy' ; then
+			$INSTALL -m 555 $INSTALL_O root -g $GROUP examples/startup.sh $startup_script
+			if hasCommand chkconfig ; then
+				# Red Hat Linux
+				chkconfig --add ${TARNAME}
+			elif hasCommand update-rc.d ; then
+				# Debian Linux
+				update-rc.d ${TARNAME} defaults 18
+			fi
+		else
+			startup_script='NO'
+		fi
+	fi
+else
+	$INSTALL -m 555 $INSTALL_O root -g $GROUP examples/startup.sh $startup_script
+	if hasCommand chkconfig ; then
+		# Red Hat Linux
+		chkconfig --add ${TARNAME}
+	elif hasCommand update-rc.d ; then
+		# Debian Linux
+		update-rc.d ${TARNAME} defaults 18
+	fi
+fi
+
+if test -d doc ; then
+	$INSTALL -m 555 -d $doc/Img
+	$INSTALL -m 555 doc/*.* $doc
+	$INSTALL -m 555 doc/Img/* $doc/Img
+fi
+
+if test -d examples; then
+	$INSTALL -m 555 -d $examples
+	$INSTALL -m 555 examples/* $examples
+fi
+
+$INSTALL -m 555 $INSTALL_O root $TARNAME $program
+
+echo
+echo '***************************************************************'
+echo
+echo 'The following files were installed:'
+echo
+echo "  $program"
+if test -d doc ; then
+	for file in doc/* ; do 
+		file=`basename $file`
+echo "  $doc/$file"
+	done
+	for file in doc/Img/* ; do 
+		file=`basename $file`
+echo "  $doc/Img/$file"
+	done
+fi
+if test -d examples; then
+	for file in examples/*; do 
+		file=`basename $file`
+echo "  $examples/$file"
+	done
+fi
+if test "X$startup_script" != 'XNO' ; then
+echo "  $startup_script"
+fi
+echo
+echo 'Remember to review the sample configuration files above with'
+echo 'your current configuration as existing options sometimes are'
+echo 'deleted or renamed, and new ones added between revisions.'
+echo 
+if test $UNAME = 'OpenBSD' ; then
+echo 'Remember to modify your /etc/rc or /etc/rc.local script to '
+echo 'startup the milter before sendmail on system boot.'
+echo
+fi
+echo '***************************************************************'
+echo
+
+exit 0

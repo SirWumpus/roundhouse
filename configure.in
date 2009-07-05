@@ -1,0 +1,115 @@
+#######################################################################
+#	Thus it begins...
+#######################################################################
+
+AC_INIT(roundhouse, 0.5, [Anthony Howe <achowe@snert.com>])
+
+dnl The autoconf version I learned to deal with.
+AC_PREREQ(2.57)
+
+dnl Yes I wrote this mess.
+SNERT_INIT([],[Copyright 2005, 2006 by Anthony Howe. All rights reserved.], [BUILD_ID.TXT])
+AC_DEFINE_UNQUOTED(_PLATFORM, [["${platform}"]])
+
+AC_SUBST(rel_incdir, '../../include')
+AC_SUBST(rel_libdir, '../../lib')
+AC_SUBST(rel_tardir, '../../../..')
+
+#######################################################################
+#	Auxliary files to be modified later
+#######################################################################
+
+AC_CONFIG_FILES(makefile)
+AC_CONFIG_HEADERS(config.h)
+AC_CONFIG_FILES(config.h.in)
+AC_CONFIG_FILES(install.sh)
+AC_CONFIG_FILES(doc/manual.shtml:manual.shtml.in)
+AC_CONFIG_FILES(examples/startup.sh:startup.sh.in)
+
+#######################################################################
+#	Configuration options: settings
+#######################################################################
+
+SNERT_OPTION_ENABLE_DEBUG
+
+AC_ARG_ENABLE(
+	fork, [AC_HELP_STRING([--enable-fork],[use process fork model instead of threads])],
+	[
+		AC_DEFINE_UNQUOTED(ENABLE_FORK)
+	]
+)
+AC_SUBST(enable_fork)
+
+SNERT_OPTION_ENABLE_RUN_USER(root)
+SNERT_OPTION_ENABLE_RUN_GROUP(daemon)
+
+#######################################################################
+#	Configuration options: packages
+#######################################################################
+
+#######################################################################
+#	Load LibSnert Configuration 
+#######################################################################
+
+if test -f '../lib/version.sh' ; then
+	snert_libsnert=yes
+	. '../lib/version.sh'
+	
+	AC_SUBST(CC)
+	AC_SUBST(CC_O)
+	AC_SUBST(CC_E)
+	AC_SUBST(CFLAGS)
+	AC_SUBST(LDFLAGS)
+	AC_SUBST(ARCHIVE)
+	AC_SUBST(COMPILE)
+	AC_SUBST(RANLIB)
+	AC_SUBST(LIBEXT)
+	AC_SUBST(OBJEXT)
+	AC_SUBST(EXEEXT)
+	AC_SUBST(AUTOCONF)
+	AC_SUBST(MD5SUM)	
+	AC_SUBST(TAR_I)
+	
+	AC_SUBST(HAVE_LIB_RT)
+	AC_SUBST(HAVE_LIB_PTHREAD)
+
+	if test "X${HAVE_LIB_PTHREAD}" = 'X' ; then
+		echo
+		echo '***************************************************************'
+		echo "       Sendmail milters require POSIX thread support."
+		echo '***************************************************************'
+		echo
+		exit 1	
+	fi	
+	
+	LIBS="${LIBS} ${HAVE_LIB_RT} ${HAVE_LIB_PTHREAD}"
+else
+	snert_libsnert=no
+	echo
+	echo '***************************************************************'
+	echo 'Oi! You must download, configure, and build LibSnert first!'
+	echo '***************************************************************'
+	echo
+fi
+
+#######################################################################
+#	Generate output.
+#######################################################################
+
+echo
+echo "Generating files..."
+echo
+AC_OUTPUT()
+
+echo
+echo $PACKAGE_NAME/$package_major.$package_minor.$package_build
+echo $package_copyright
+echo
+AC_MSG_RESULT([  Platform..........: $platform])
+AC_MSG_RESULT([  prefix............: $prefix])
+AC_MSG_RESULT([  exec_prefix.......: $exec_prefix])
+AC_MSG_RESULT([  sbindir...........: $sbindir])
+AC_MSG_RESULT([  CFLAGS............: $CFLAGS])
+AC_MSG_RESULT([  LDFLAGS...........: $LDFLAGS])
+AC_MSG_RESULT([  LIBS..............: $LIBS])
+echo

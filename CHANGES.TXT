@@ -1,0 +1,88 @@
+CHANGES
+-------
+
+The major number changes for such things as code rewrites, changes in
+syntax, and/or dramatic changes in functionality. The minor number
+changes for corrections, enhancements, etc. made to the code. There
+is no set schedule for releases.
+
+--TODO--
+
+   +	Consider adding SASL and man-in-middle support for AUTH
+	DIGEST-MD5 and possibly other mechanisms.
+	
+   +	Consider adding man-in-middle support for STARTTLS.
+
+--0.5.14--
+
+  !!	License 1.4 which provides additional details with regards to
+  	possible license controls used, the possibility of "phone
+  	home code" and its general contents, and related privacy
+  	statement.
+
+--0.5--
+
+   !	Unix: Corrections for gcc -Wall warnings and errors.
+
+   !	unix: Fix the dropping of privileges to be more precise with
+	respect to the saved IDs, which can be problematic on some
+	OSes which handle setuid() with slightly different semantics.
+	The following was an interesting discussion of the issues:
+   	
+   	http://www.cs.berkeley.edu/~daw/papers/setuid-usenix02.pdf
+   
+   !	Added #ifdef wrappers for some of the more esoteric functions.
+
+   +	Added process fork() support when there is no POSIX threads.
+   	Minix 3.1.2 doesn't support threads yet. 
+   	
+--0.4--
+
+   !	unix: Fixed binding to port 25 when -u option is used. 
+
+   !	Make sure to set the user's supplemental groups or release
+   	those of root.
+   
+   !	socketReadLine() handles the timeouts on non-blocking sockets,
+	so socketHasInput() in smtpGetResponse() is not required.
+	
+   !	Guard against buffer overflow when appending CRLF to the
+	client input buffer and single server response.
+   
+--0.3--
+
+   +	Requires LibSnert 1.57.
+
+   +	fixed use of setlogmask() for Unix syslog() API.
+   
+   +	roundhouse() now disables socket linger and Nagle algorithm to
+	improve throughput on high volume mail servers.
+   	
+  !!	socketAccept() failed to return NULL in the event of an
+	accept() error and would return a pointer to freed memory.
+   	
+--0.2--
+
+   +	Requires LibSnert 1.56.
+
+   +	Moved socket.[ch] into LibSnert.
+   
+   +	Moved clamstream.c into LibSnert tools.
+
+   !	Renamed Socket type to Socket2 with move of socket.[ch].
+   
+   +	Added support for AUTH LOGIN used by Outlook Express.
+   
+   -	Dropped AUTH DIGEST-MD5 from the EHLO response. Its not
+	possible to multiplex the different SMTP responses from
+	multple servers.
+	
+   !	When -a is used then all log output goes to standard error
+	instead of syslog().
+
+--0.1--
+
+   +	Requires LibSnert 1.52.
+
+
+
