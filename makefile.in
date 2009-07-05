@@ -68,21 +68,23 @@ O = .@OBJEXT@
 E = @EXEEXT@
 .SUFFIXES : .c $O $E
 
+.MAIN : build
+
 build : ${TARNAME}$E
 	@echo
 	@echo '***************************************************************'
-	@echo build `cat BUILD_ID.TXT` DONE
+	@echo build @PACKAGE_VERSION@.`cat BUILD_ID.TXT` DONE
 	@echo '***************************************************************'
 	@echo
 
 build-w32 : ${TARNAME}.exe
 	@echo
 	@echo '***************************************************************'
-	@echo build-w32 `cat BUILD_ID.TXT` DONE
+	@echo build-w32 @PACKAGE_VERSION@.`cat BUILD_ID.TXT` DONE
 	@echo '***************************************************************'
 	@echo
 
-clean : 
+clean :
 	-rm -rf autom4te.cache configure.lineno *.log *.o *.obj ${TARNAME}$E *.exe
 	@echo
 	@echo '***************************************************************'
@@ -90,7 +92,7 @@ clean :
 	@echo '***************************************************************'
 	@echo
 
-distclean : 
+distclean :
 	-rm -rf autom4te.cache configure.lineno *.log *.o *.obj
 	-rm -f config.status config.h.in config.h ${TARNAME}$E ${TARNAME}-w32.exe
 	-rm -rf makefile examples
@@ -103,7 +105,7 @@ distclean :
 strip: build
 	strip ${TARNAME}$E
 
-next-id: 
+next-id:
 	expr `cat BUILD_ID.TXT` + 1 >BUILD_ID.TXT
 
 install: build install.sh
@@ -111,7 +113,7 @@ install: build install.sh
 
 install.sh: install.sh.in config.status
 
-${TARNAME}: BUILD_ID.TXT ${TARNAME}.c 
+${TARNAME}: BUILD_ID.TXT ${TARNAME}.c
 	$(CC) -D_BUILD=$(_BUILD) -D_BUILD_STRING='"'$(_BUILD)'"' \
 	${DEFINES} $(CFLAGS) $(LDFLAGS) $(CC_E)${TARNAME} ${TARNAME}.c $(LIBS)
 
@@ -127,7 +129,7 @@ ${TARNAME}: BUILD_ID.TXT ${TARNAME}.c
 #
 # NOTE this produces smaller code than Borland C++ 5.5 command line tools.
 #
-${TARNAME}.exe: BUILD_ID.TXT ${TARNAME}.c 
+${TARNAME}.exe: BUILD_ID.TXT ${TARNAME}.c
 	gcc ${DEFINES} ${CFLAGS} -mno-cygwin -mwindows ${LDFLAGS} ${W32_CFLAGS} ${W32_LDFLAGS} -o ${TARNAME}.exe ${TARNAME}.c ${LIBS}
 
 configure: aclocal.m4 configure.in
@@ -138,10 +140,10 @@ config.status : configure
 
 doc/manual.shtml: config.status manual.shtml.in
 	./config.status doc/manual.shtml
-	
+
 makefile: makefile.in config.status
 	./config.status makefile
-        
+
 pack: next-id tar
 
 list:
@@ -166,7 +168,7 @@ tar: doc/manual.shtml
 
 predefines:
 	gcc  -dM -E -xc /dev/null >gcc.txt
-	
+
 #	gcc  -mno-cygwin -dM -E -xc /dev/null >gcc-mno-cygwin.txt
 #	gcc  -mwin32 -dM -E -xc /dev/null >gcc-mwin32.txt
 

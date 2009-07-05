@@ -95,12 +95,6 @@
 
 #include <com/snert/lib/version.h>
 
-#if defined(__MINGW32__)
-# define HAVE_PTHREAD_CREATE
-#elif defined(ENABLE_FORK)
-# undef HAVE_PTHREAD_CREATE
-#endif
-
 #include <errno.h>
 #include <stdlib.h>
 
@@ -252,24 +246,6 @@ signalExit(int signum)
 	exit(0);
 }
 
-#if !defined(HAVE_PTHREAD_CREATE)
-void
-signalReaper(int signum)
-{
-	int saved_errno = errno;
-
-	while (0 < waitpid(0, NULL, WNOHANG) || errno == EINTR)
-		;
-
-	errno = saved_errno;
-
-	/* NOTE that between the end of while loop and the return from
-	 * the SIGCHLD handler, we can miss the death of another child
-	 * process, because signals are not queued.
-	 */
-}
-#endif
-
 static long
 smtpConnPrint(Connection *conn, int index, char *line)
 {
@@ -348,9 +324,8 @@ proxyStream(void *data)
 	Stream *stream = (Stream *) data;
 	Connection *conn = stream->conn;
 
-#if defined(HAVE_PTHREAD_CREATE)
 	(void) pthread_detach(pthread_self());
-#endif
+
 	while (socketHasInput(stream->source, socketTimeout)) {
 		if (socketRead(stream->source, conn->input, sizeof (conn->input)) < 0) {
 			syslog(LOG_ERR, TAG_FORMAT "proxyStream() read error: %s (%d)", TAG_ARGS, strerror(errno), errno);
@@ -372,6 +347,7 @@ int
 proxyTLS(Connection *conn)
 {
 	int i, code;
+	pthread_t thread;
 	Stream *c2s, *s2c;
 
 	if ((s2c = malloc(sizeof (*s2c))) == NULL)
@@ -397,22 +373,8 @@ proxyTLS(Connection *conn)
 	if (smtpConnGetResponse(conn, 0, conn->reply, sizeof (conn->reply), &code) || code != 220)
 		goto error2;
 
-#if defined(HAVE_PTHREAD_CREATE)
-{
-	pthread_t thread;
-
 	if (pthread_create(&thread, NULL, proxyStream, s2c))
 		goto error2;
-}
-#else
-	switch (fork()) {
-	case -1:
-		goto error2;
-	case 0:
-		proxyStream(s2c);
-		exit(0);
-	}
-#endif
 
 	smtpConnPrint(conn, -1, "220 Ready to start TLS\r\n");
 
@@ -421,16 +383,6 @@ proxyTLS(Connection *conn)
 		smtpConnDisconnect(conn, i);
 
 	(void) proxyStream(c2s);
-
-#if !defined(HAVE_PTHREAD_CREATE)
-	/* "Its 23h00. Do you know where your children are?"
-	 *
-	 * The child exit status is collected and ignored by the
-	 * signalReaper(), which is called once now and again in
-	 * ServerMain() accept loop.
-	 */
-	signalReaper(0);
-#endif
 
 	return 0;
 error2:
@@ -632,9 +584,7 @@ roundhouse(void *data)
 	int i, code, isQuit, isData, isEhlo, serversRemaining;
 
 	conn = (Connection *) data;
-#if defined(HAVE_PTHREAD_CREATE)
 	(void) pthread_detach(pthread_self());
-#endif
 	(void) socketSetNagle(conn->client, 0);
 	(void) socketSetLinger(conn->client, 0);
 	(void) socketSetNonBlocking(conn->client, 1);
@@ -847,8 +797,10 @@ void
 ServerMain(void)
 {
 	int i;
+	pthread_t thread;
 	Connection *conn;
 	SocketAddress addr;
+	sigset_t sigpipe_set;
 	volatile unsigned short counter;
 
 	syslog(LOG_INFO, _DISPLAY "/" _VERSION " " _COPYRIGHT);
@@ -890,10 +842,6 @@ ServerMain(void)
 
 	syslog(LOG_INFO, "process uid=%d gid=%d", getuid(), getgid());
 #endif
-#if defined(HAVE_PTHREAD_CREATE)
-{
-	pthread_t thread;
-	sigset_t sigpipe_set;
 
 	/* Assert that SIGPIPE has been blocked in this thread.
 	 * Note that we never unblock this signal, because its
@@ -909,18 +857,9 @@ ServerMain(void)
 	 */
 	(void) pthread_create(&thread, NULL, licenseControl, NULL);
 	(void) pthread_detach(thread);
-}
-#else
-	if (fork() == 0) {
-		licenseControl(NULL);
-		exit(0);
-	}
-#endif
+
 	/* Use "kill" to terminate the parent server process. */
 	for (counter = 0; (conn = calloc(1, sizeof (*conn))) != NULL; ) {
-#if !defined(HAVE_PTHREAD_CREATE)
-		signalReaper(0);
-#endif
 		conn->client = socketAccept(listener);
 
 		if (conn->client == NULL) {
@@ -936,39 +875,11 @@ ServerMain(void)
 
 		syslog(LOG_INFO, "%.5u client=%d client_addr=%s", conn->id, conn->client->fd, conn->client_addr);
 
-#if defined(HAVE_PTHREAD_CREATE)
-{
-		pthread_t thread;
-
 		if (pthread_create(&thread, NULL, roundhouse, conn)) {
 			syslog(LOG_ERR, TAG_FORMAT "failed to create thread: %s, (%d)", TAG_ARGS, strerror(errno), errno);
 			socketClose(conn->client);
 			free(conn);
 		}
-}
-#else
-{
-		pid_t child = fork();
-
-		switch (child) {
-		case 0:
-			(void) roundhouse(conn);
-			exit(0);
-		case -1:
-			/* Thread failed to start, abandon the client. */
-			syslog(LOG_ERR, TAG_FORMAT "failed to create child: %s, (%d)", TAG_ARGS, strerror(errno), errno);
-			socketShutdown(conn->client, SHUT_WR);
-			break;
-		default:
-			syslog(LOG_DEBUG, TAG_FORMAT "new child worker=%d\n", TAG_ARGS, child);
-		}
-
-		/* Close the socket without calling shutdown(). */
-		closesocket(conn->client->fd);
-		free(conn->client);
-		free(conn);
-}
-#endif
 	}
 
 	syslog(LOG_ERR, "unexpected error in ServerMain(): %s (%d)", strerror(errno), errno);
