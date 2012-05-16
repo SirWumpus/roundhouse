@@ -39,25 +39,34 @@ SNERT_LIBDIR	= @rel_libdir@
 
 TARFILE	= ${TARNAME}-${VERSION}.tar.gz
 
-CC	= @CC@
-CC_E	= @CC_E@
-CC_O	= @CC_O@
-CFLAGS	= @CFLAGS@
-LDFLAGS	= @LDFLAGS@
-LIBS	= @LIBS@
-
 #W32_CFLAGS	= -DNDEBUG -O2 -s -mno-cygwin -mwindows
 W32_CFLAGS	= -mno-cygwin -mwindows
 #W32_LDFLAGS	= -Wl,--heap,131072,--stack,32768
 
-ARCHIVE	= @ARCHIVE@
-COMPILE	= @COMPILE@
-RANLIB	= @RANLIB@
-MD5SUM	= @MD5SUM@
-AUTOCONF= @AUTOCONF@
-TAR_I	= @TAR_I@
+CC		:= @CC@
+CC_E		:= @CC_E@
+CC_O		:= @CC_O@
+TAR_I		:= @TAR_I@
 
-_BUILD=`cat BUILD_ID.TXT`
+ARCHIVE		:= @ARCHIVE@
+COMPILE		:= @COMPILE@
+RANLIB		:= @RANLIB@
+MD5SUM		:= @MD5SUM@
+AUTOCONF	:= @AUTOCONF@
+
+_BUILD		:=`cat BUILD_ID.TXT`
+
+LIBSNERT 	:= @LIBSNERT@
+LIB_RT 		:= @HAVE_LIB_RT@
+LIB_SEM		:= @HAVE_LIB_SEM@
+
+LIB_PTHREAD	:= @HAVE_LIB_PTHREAD@
+CFLAGS_PTHREAD	:= @CFLAGS_PTHREAD@
+LDFLAGS_PTHREAD	:= @LDFLAGS_PTHREAD@
+
+CFLAGS		:= @CFLAGS@
+LDFLAGS		:= @LDFLAGS@
+LIBS		:= @LIBS@
 
 ########################################################################
 ### No further configuration beyond this point.
@@ -149,12 +158,12 @@ pack: next-id tar
 list:
 	tar -ztf ${SNERT_TARDIR}/${TARFILE}
 
-tar: doc/manual.shtml
+tar: configure doc/manual.shtml
 	@echo
 	@echo '***************************************************************'
 	@echo
 	-rm -rf $(SNERT_TARDIR)/$(TARFILE) ${TARNAME}.md5 autom4te.cache configure.lineno
-	echo '${VERSION}.'`cat BUILD_ID.TXT` >VERSION.TXT
+	echo '${VERSION}.'${_BUILD} >VERSION.TXT
 	echo '${TARNAME}-${VERSION}.tar.gz' >FILE.TXT
 	-strip ${TARNAME}-w32.exe
 	tar -C ${SNERT_TARDIR} ${TAR_I} MANIFEST.TXT -zcf ${SNERT_TARDIR}/${TARFILE}

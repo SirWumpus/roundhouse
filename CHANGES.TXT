@@ -10,8 +10,30 @@ is no set schedule for releases.
 
    +	Consider adding SASL and man-in-middle support for AUTH
 	DIGEST-MD5 and possibly other mechanisms.
-	
+
    +	Consider adding man-in-middle support for STARTTLS.
+
+
+--0.6.0--
+
+   *	Requires LibSnert 1.75.11
+
+   !	Configure and build changes to reflect changes in libsnert.
+
+   !	Removed process fork compile option and relevent code.
+
+   !	Changed the command line options. Replaced -p port with -i a
+	list of ip:port to bind. Replaced -a by -d. Changed -w to take
+	an argument. Added -q.
+
+   !	Converted to use LibSnert net/server and sys/winService APIs.
+   	This is more efficient as it uses a pre-spawned pool of server
+   	threads. It also brings with it IPv6 support.
+
+   !	Changed the command line options. Replaced -p with -i. Replaced
+   	-a by -d. Added -q and changed -w.
+
+   !	Removed phone home code.
 
 --0.5.14--
 
@@ -28,55 +50,55 @@ is no set schedule for releases.
 	respect to the saved IDs, which can be problematic on some
 	OSes which handle setuid() with slightly different semantics.
 	The following was an interesting discussion of the issues:
-   	
+
    	http://www.cs.berkeley.edu/~daw/papers/setuid-usenix02.pdf
-   
+
    !	Added #ifdef wrappers for some of the more esoteric functions.
 
    +	Added process fork() support when there is no POSIX threads.
-   	Minix 3.1.2 doesn't support threads yet. 
-   	
+   	Minix 3.1.2 doesn't support threads yet.
+
 --0.4--
 
-   !	unix: Fixed binding to port 25 when -u option is used. 
+   !	unix: Fixed binding to port 25 when -u option is used.
 
    !	Make sure to set the user's supplemental groups or release
    	those of root.
-   
+
    !	socketReadLine() handles the timeouts on non-blocking sockets,
 	so socketHasInput() in smtpGetResponse() is not required.
-	
+
    !	Guard against buffer overflow when appending CRLF to the
 	client input buffer and single server response.
-   
+
 --0.3--
 
    +	Requires LibSnert 1.57.
 
    +	fixed use of setlogmask() for Unix syslog() API.
-   
+
    +	roundhouse() now disables socket linger and Nagle algorithm to
 	improve throughput on high volume mail servers.
-   	
+
   !!	socketAccept() failed to return NULL in the event of an
 	accept() error and would return a pointer to freed memory.
-   	
+
 --0.2--
 
    +	Requires LibSnert 1.56.
 
    +	Moved socket.[ch] into LibSnert.
-   
+
    +	Moved clamstream.c into LibSnert tools.
 
    !	Renamed Socket type to Socket2 with move of socket.[ch].
-   
+
    +	Added support for AUTH LOGIN used by Outlook Express.
-   
+
    -	Dropped AUTH DIGEST-MD5 from the EHLO response. Its not
 	possible to multiplex the different SMTP responses from
 	multple servers.
-	
+
    !	When -a is used then all log output goes to standard error
 	instead of syslog().
 

@@ -11,6 +11,10 @@
 extern "C" {
 #endif
 
+/***********************************************************************
+ ***
+ ***********************************************************************/
+
 #undef _NAME
 #undef _MAJOR
 #undef _MINOR
@@ -18,13 +22,61 @@ extern "C" {
 #undef _VERSION
 #undef _COPYRIGHT
 #undef _PLATFORM
+#undef _CONFIGURE
+#undef _CFLAGS
+#undef _LDFLAGS
+#undef _LIBS
+#undef _BUILT
 
 #ifndef __@platform@__
-#define __@platform@__		1	
+#define __@platform@__		1
 #endif
 
 #undef NDEBUG
-#undef ENABLE_FORK
+
+#ifndef EMPTY_DIR
+#define EMPTY_DIR			"/var/empty"
+#endif
+
+#if !defined(CF_DIR)
+# if defined(__WIN32__)
+#  define CF_DIR			"."
+# else
+#  define CF_DIR			"/etc/" _NAME
+# endif
+#endif
+
+#if !defined(CF_FILE)
+# define CF_FILE			CF_DIR "/" _NAME ".cf"
+#endif
+
+#ifndef SAFE_PATH
+# if defined(__WIN32__)
+#  define SAFE_PATH			CF_DIR
+# else
+#  define SAFE_PATH			"/bin:/usr/bin"
+# endif
+#endif
+
+#if !defined(PID_FILE)
+# if defined(__WIN32__)
+#  define PID_FILE			CF_DIR "/" _NAME ".pid"
+# else
+#  define PID_FILE			"/var/run/" _NAME ".pid"
+# endif
+#endif
+
+#ifndef SOCKET_TIMEOUT
+#define SOCKET_TIMEOUT			300000
+#endif
+
+#ifndef MAX_ARGV_LENGTH
+#define MAX_ARGV_LENGTH			30
+#endif
+
+/***********************************************************************
+ ***
+ ***********************************************************************/
 
 #ifdef  __cplusplus
 }

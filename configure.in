@@ -8,7 +8,7 @@ dnl The autoconf version I learned to deal with.
 AC_PREREQ(2.57)
 
 dnl Yes I wrote this mess.
-SNERT_INIT([],[Copyright 2005, 2009 by Anthony Howe. All rights reserved.], [BUILD_ID.TXT])
+SNERT_INIT([],[Copyright 2005, 2012 by Anthony Howe. All rights reserved.], [BUILD_ID.TXT])
 AC_DEFINE_UNQUOTED(_PLATFORM, [["${platform}"]])
 
 AC_SUBST(rel_incdir, '../../include')
@@ -46,6 +46,18 @@ if test -f '../lib/version.sh' ; then
 	snert_libsnert=yes
 	. '../lib/version.sh'
 
+	SNERT_TAR_SETTINGS
+
+	AC_SUBST(LIBSNERT_MAJOR)
+	AC_SUBST(LIBSNERT_MINOR)
+	AC_SUBST(LIBSNERT_BUILD)
+	AC_SUBST(LIBSNERT_NAME)
+	AC_SUBST(LIBSNERT_VERSION)
+	AC_SUBST(LIBSNERT_STRING)
+	AC_SUBST(LIBSNERT_AUTHOR)
+	AC_SUBST(LIBSNERT_COPYRIGHT)
+	AC_SUBST(LIBSNERT_UNAME)
+
 	AC_SUBST(CC)
 	AC_SUBST(CC_O)
 	AC_SUBST(CC_E)
@@ -61,19 +73,27 @@ if test -f '../lib/version.sh' ; then
 	AC_SUBST(MD5SUM)
 	AC_SUBST(TAR_I)
 
+	AC_SUBST(ENABLE_MINGW)
+
 	AC_SUBST(HAVE_LIB_RT)
 	AC_SUBST(HAVE_LIB_PTHREAD)
+	AC_SUBST(HAVE_LIB_WS2_32)
+	AC_SUBST(HAVE_LIB_IPHLPAPI)
 
-	if test "X${HAVE_LIB_PTHREAD}" = 'X' ; then
+	expr "${CFLAGS}" : '.*-pthread' >/dev/null ;
+	has_freebsd_pthread=$?
+	if test "${HAVE_LIB_PTHREAD:-no}" = 'no' -a "${CFLAGS_PTHREAD:-no}" = 'no' -a "${ENABLE_MINGW:-no}" = 'no'; then
 		echo
 		echo '***************************************************************'
-		echo "       Roundhouse require POSIX thread support."
+		echo "***     This application requires POSIX thread support.     ***"
 		echo '***************************************************************'
 		echo
 		exit 1
 	fi
 
-	LIBS="${LIBS} ${HAVE_LIB_RT} ${HAVE_LIB_PTHREAD}"
+	CFLAGS="${CFLAGS_PTHREAD} ${CFLAGS}"
+	LDFLAGS="${LDFLAGS_PTHREAD} ${LDFLAGS}"
+	LIBS="${LIBS} ${NETWORK_LIBS} ${HAVE_LIB_PTHREAD} ${HAVE_LIB_WS2_32} ${HAVE_LIB_IPHLPAPI}"
 else
 	snert_libsnert=no
 	echo
@@ -90,6 +110,7 @@ fi
 echo
 echo "Generating files..."
 echo
+SNERT_FINI
 AC_OUTPUT()
 
 echo

@@ -1,7 +1,7 @@
 /*
  * roundhouse.c
  *
- * Copyright 2005, 2006 by Anthony Howe. All rights reserved.
+ * Copyright 2005, 2012 by Anthony Howe. All rights reserved.
  *
  *
  * From http://www.answers.com/roundhouse&r=67
@@ -47,26 +47,6 @@
 /***********************************************************************
  *** You can change the stuff below if the configure script doesn't work.
  ***********************************************************************/
-
-#ifndef EMPTY_DIR
-#define EMPTY_DIR		"/var/empty"
-#endif
-
-#ifndef CF_FILE
-#define CF_FILE			"/etc/" _NAME ".cf"
-#endif
-
-#ifndef PID_FILE
-#define PID_FILE		"/var/run/" _NAME ".pid"
-#endif
-
-#ifndef SOCKET_TIMEOUT
-#define SOCKET_TIMEOUT		300000
-#endif
-
-#ifndef MAX_ARGV_LENGTH
-#define MAX_ARGV_LENGTH		20
-#endif
 
 #ifndef AUTH_MECHANISMS
 /*
@@ -124,18 +104,20 @@
 
 #include <com/snert/lib/io/Log.h>
 #include <com/snert/lib/io/socket2.h>
-#include <com/snert/lib/mail/smtp.h>
 #include <com/snert/lib/mail/limits.h>
 #include <com/snert/lib/mail/parsePath.h>
+#include <com/snert/lib/net/server.h>
 #include <com/snert/lib/sys/pthread.h>
+#include <com/snert/lib/sys/process.h>
+#include <com/snert/lib/sys/sysexits.h>
 #include <com/snert/lib/sys/Time.h>
 #include <com/snert/lib/util/Text.h>
 #include <com/snert/lib/util/Base64.h>
 #include <com/snert/lib/util/Token.h>
 #include <com/snert/lib/util/getopt.h>
 
-#if LIBSNERT_MAJOR < 1 || LIBSNERT_MINOR < 61
-# error "LibSnert/1.61 or better is required"
+#if LIBSNERT_MAJOR < 1 || LIBSNERT_MINOR < 75
+# error "LibSnert/1.75 or better is required"
 #endif
 
 /***********************************************************************
@@ -145,23 +127,19 @@
 #define _DISPLAY	"Roundhouse"
 #define _BRIEF		"SMTP Multiplexor"
 
-#define TAG_FORMAT	"%.5u "
-#define TAG_ARGS	conn->id
+#define LOG_FMT		"%s "
+#define LOG_ARG		conn->id
 
-#ifndef _STRING
-# ifdef _BUILD_STRING
-#  define _STRING		_NAME "/" _VERSION "." _BUILD_STRING
-# else
-#  define _STRING		_NAME "/" _VERSION
-# endif
-#endif
+static const char log_oom[] = "out of memory %s(%d)";
+static const char log_init[] = "init error %s(%d): %s (%d)";
+static const char log_internal[] = "internal error %s(%d): %s (%d)";
 
 /***********************************************************************
  *** Global Variables
  ***********************************************************************/
 
 typedef struct {
-	unsigned id;
+	char *id;
 	int nservers;
 	Socket2 *client;
 	Socket2 **servers;
@@ -177,44 +155,75 @@ typedef struct {
 	Socket2 *sink;
 } Stream;
 
-#ifdef __unix__
-static uid_t ruid;
-static uid_t euid;
-#endif
-
 static int debug;
-static int install_service;
-static int application_mode;
+static int server_quit;
+static int daemon_mode = 1;
 static char *user_id = NULL;
 static char *group_id = NULL;
+static char *windows_service;
+static char *interfaces = "[::0]:" QUOTE(SMTP_PORT) ",0.0.0.0:" QUOTE(SMTP_PORT);
+static long socket_timeout = SOCKET_TIMEOUT;
 
 static int nservers;
 static char *smtp_host[MAX_ARGV_LENGTH];
 static SocketAddress *servers[MAX_ARGV_LENGTH];
 
-static Socket2 *listener;
-static char *listener_port = "25";
-static long socketTimeout = SOCKET_TIMEOUT;
+static ServerSignals signals;
 
-static char *usageMessage =
-"usage: " _NAME " [-avw][-g name][-p port][-t timeout][-u name] server ...\n"
+static char *usage_message =
+"usage: " _NAME " [-dqv][-i ip,...][-t timeout] \\\n"
+"       [-u name][-g name][-w add|remove] server ...\n"
 "\n"
-"-a\t\trun as a foreground application, default run in background\n"
-"-g name\t\trun as this group (Unix)\n"
-"-p port\t\tport to listen for connections, default 25\n"
-"-t timeout\tclient socket timeout in seconds, default 5m\n"
-"-u name\t\trun as this user (Unix)\n"
+"-d\t\tdisable daemon mode and run as a foreground application\n"
+"-g name\t\trun as this group\n"
+"-i ip,...\tcomma separated list of IPv4 or IPv6 addresses and\n"
+"\t\toptional :port number to listen on for SMTP connections;\n"
+"\t\tdefault is \"[::0]:25,0.0.0.0:25\"\n"
+"-q\t\tx1 slow quit, x2 quit now, x3 restart, x4 restart-if\n"
+"-t timeout\tclient socket timeout in seconds, default 300\n"
+"-u name\t\trun as this user\n"
 "-v\t\tverbose maillog output\n"
-"-w\t\ttoggle add/remove Windows service.\n"
+"-w add|remove\tadd or remove Windows service\n"
 "\n"
-"server\t\ta unix domain socket path or host[,port] specifier\n"
+"server\t\ta unix domain socket path or host[:port] specifier. The\n"
+"\t\tfirst server specified is the primary host that can handle\n"
+"\t\tSMTP STARTTLS.\n"
 "\n"
-_STRING " Copyright 2005, 2006 by Anthony Howe. All rights reserved.\n"
+_NAME " " _VERSION " " _COPYRIGHT "\n"
 ;
 
 /***********************************************************************
  *** Routines
  ***********************************************************************/
+
+#undef syslog
+
+void
+syslog(int level, const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	if (logFile == NULL)
+		vsyslog(level, fmt, args);
+	else
+		LogV(level, fmt, args);
+	va_end(args);
+}
+
+int
+reportAccept(ServerSession *session)
+{
+	syslog(LOG_INFO, "%s start interface=[%s] client=[%s]", session->id_log, session->if_addr, session->address);
+	return 0;
+}
+
+int
+reportFinish(ServerSession *session)
+{
+	syslog(LOG_INFO, "%s end interface=[%s] client=[%s]", session->id_log, session->if_addr, session->address);
+	return 0;
+}
 
 int
 savePid(char *file)
@@ -237,23 +246,14 @@ savePid(char *file)
 	return 0;
 }
 
-void
-signalExit(int signum)
-{
-	signal(signum, SIG_IGN);
-	syslog(LOG_INFO, "signal %d received, program exit", signum);
-	socketClose(listener);
-	exit(0);
-}
-
 static long
 smtpConnPrint(Connection *conn, int index, char *line)
 {
 	if (index < 0)
 		/* Sending to the client. */
-		syslog(LOG_DEBUG, TAG_FORMAT "< %s", TAG_ARGS, line);
+		syslog(LOG_DEBUG, LOG_FMT "< %s", LOG_ARG, line);
 
-	return socketWrite(index < 0 ? conn->client : conn->servers[index], line, strlen(line));
+	return socketWrite(index < 0 ? conn->client : conn->servers[index], (unsigned char *) line, strlen(line));
 }
 
 static int
@@ -274,7 +274,7 @@ smtpConnGetResponse(Connection *conn, int index, char *line, long size, int *cod
 	value = 450;
 
 	s = conn->servers[index];
-	socketSetTimeout(s, socketTimeout / nservers);
+	socketSetTimeout(s, socket_timeout / nservers);
 
 	do {
 		/* Erase the first 4 bytes of the line buffer, which
@@ -285,10 +285,10 @@ smtpConnGetResponse(Connection *conn, int index, char *line, long size, int *cod
 
 		switch (length = socketReadLine(s, line, size)) {
 		case SOCKET_ERROR:
-			syslog(LOG_ERR, TAG_FORMAT "read error: %s (%d)", TAG_ARGS, strerror(errno), errno);
+			syslog(LOG_ERR, LOG_FMT "read error: %s (%d)", LOG_ARG, strerror(errno), errno);
 			return errno;
 		case SOCKET_EOF:
-			syslog(LOG_ERR, TAG_FORMAT "unexpected EOF", TAG_ARGS);
+			syslog(LOG_ERR, LOG_FMT "unexpected EOF", LOG_ARG);
 			return errno;
 		}
 
@@ -296,7 +296,7 @@ smtpConnGetResponse(Connection *conn, int index, char *line, long size, int *cod
 		if (length < 4)
 			return EIO;
 
-		syslog(LOG_DEBUG, TAG_FORMAT "#%d < %s", TAG_ARGS, index, line);
+		syslog(LOG_DEBUG, LOG_FMT "#%d < %s", LOG_ARG, index, line);
 
 		value = strtol(line, &stop, 10);
 	} while (line + 3 == stop && line[3] == '-');
@@ -311,7 +311,7 @@ static void
 smtpConnDisconnect(Connection *conn, int index)
 {
 	if (conn->servers[index] != NULL) {
-		syslog(LOG_DEBUG, TAG_FORMAT "#%d disconnecting from %s", TAG_ARGS, index, smtp_host[index]);
+		syslog(LOG_DEBUG, LOG_FMT "#%d disconnecting from %s", LOG_ARG, index, smtp_host[index]);
 		socketClose(conn->servers[index]);
 		conn->servers[index] = NULL;
 		conn->nservers--;
@@ -326,14 +326,14 @@ proxyStream(void *data)
 
 	(void) pthread_detach(pthread_self());
 
-	while (socketHasInput(stream->source, socketTimeout)) {
+	while (socketHasInput(stream->source, socket_timeout)) {
 		if (socketRead(stream->source, conn->input, sizeof (conn->input)) < 0) {
-			syslog(LOG_ERR, TAG_FORMAT "proxyStream() read error: %s (%d)", TAG_ARGS, strerror(errno), errno);
+			syslog(LOG_ERR, LOG_FMT "proxyStream() read error: %s (%d)", LOG_ARG, strerror(errno), errno);
 			break;
 		}
 
 		if (socketWrite(stream->sink, conn->input, sizeof (conn->input)) < 0) {
-			syslog(LOG_ERR, TAG_FORMAT "proxyStream() write error: %s (%d)", TAG_ARGS, strerror(errno), errno);
+			syslog(LOG_ERR, LOG_FMT "proxyStream() write error: %s (%d)", LOG_ARG, strerror(errno), errno);
 			break;
 		}
 	}
@@ -419,33 +419,33 @@ authLogin(Connection *conn)
 	if (conn->input[sizeof ("AUTH LOGIN")-1] == '\0') {
 		smtpConnPrint(conn, -1, "334 VXNlcm5hbWU6\r\n");
 
-		if (!socketHasInput(conn->client, socketTimeout))
+		if (!socketHasInput(conn->client, socket_timeout))
 			goto error0;
 
 		if ((userLen = socketReadLine(conn->client, userB64, sizeof (userB64))) < 0) {
-			syslog(LOG_ERR, TAG_FORMAT "client read error: %s (%d)%c", TAG_ARGS, strerror(errno), errno, userLen == SOCKET_EOF ? '!' : ' ');
+			syslog(LOG_ERR, LOG_FMT "client read error: %s (%d)%c", LOG_ARG, strerror(errno), errno, userLen == SOCKET_EOF ? '!' : ' ');
 			goto error0;
 		}
 
-		syslog(LOG_DEBUG, TAG_FORMAT "> %s", TAG_ARGS, userB64);
+		syslog(LOG_DEBUG, LOG_FMT "> %s", LOG_ARG, userB64);
 	} else {
 		TextCopy(userB64, sizeof (userB64), conn->input+sizeof ("AUTH LOGIN"));
 	}
 
 	smtpConnPrint(conn, -1, "334 UGFzc3dvcmQ6\r\n");
 
-	if (!socketHasInput(conn->client, socketTimeout))
+	if (!socketHasInput(conn->client, socket_timeout))
 		goto error0;
 
 	if ((passLen = socketReadLine(conn->client, passB64, sizeof (passB64))) < 0) {
-		syslog(LOG_ERR, TAG_FORMAT "client read error: %s (%d)%c", TAG_ARGS, strerror(errno), errno, passLen == SOCKET_EOF ? '!' : ' ');
+		syslog(LOG_ERR, LOG_FMT "client read error: %s (%d)%c", LOG_ARG, strerror(errno), errno, passLen == SOCKET_EOF ? '!' : ' ');
 		goto error0;
 	}
 
-	syslog(LOG_DEBUG, TAG_FORMAT "> %s", TAG_ARGS, passB64);
+	syslog(LOG_DEBUG, LOG_FMT "> %s", LOG_ARG, passB64);
 
 	if ((base64 = Base64Create()) == NULL) {
-		syslog(LOG_ERR, TAG_FORMAT "Base64Create() error", TAG_ARGS);
+		syslog(LOG_ERR, LOG_FMT "Base64Create() error", LOG_ARG);
 		goto error0;
 	}
 
@@ -453,11 +453,11 @@ authLogin(Connection *conn)
 	switch ((rx = base64->decodeBuffer(base64, userB64, userLen, &buffer, &userLen))) {
 	case BASE64_NEXT:
 	case BASE64_ERROR:
-		syslog(LOG_ERR, TAG_FORMAT "login Base64DecodeBuffer error rc=%d", TAG_ARGS, rx);
+		syslog(LOG_ERR, LOG_FMT "login Base64DecodeBuffer error rc=%d", LOG_ARG, rx);
 		goto error1;
 	}
 	if (255 < userLen) {
-		syslog(LOG_ERR, TAG_FORMAT "login too long, length=%ld", TAG_ARGS, userLen);
+		syslog(LOG_ERR, LOG_FMT "login too long, length=%ld", LOG_ARG, userLen);
 		goto error2;
 	}
 
@@ -476,11 +476,11 @@ authLogin(Connection *conn)
 	switch ((rx = base64->decodeBuffer(base64, passB64, passLen, &buffer, &passLen))) {
 	case BASE64_NEXT:
 	case BASE64_ERROR:
-		syslog(LOG_ERR, TAG_FORMAT "password Base64DecodeBuffer error rc=%d", TAG_ARGS, rx);
+		syslog(LOG_ERR, LOG_FMT "password Base64DecodeBuffer error rc=%d", LOG_ARG, rx);
 		goto error1;
 	}
 	if (255 < passLen) {
-		syslog(LOG_ERR, TAG_FORMAT "password too long, length=%ld", TAG_ARGS, passLen);
+		syslog(LOG_ERR, LOG_FMT "password too long, length=%ld", LOG_ARG, passLen);
 		goto error2;
 	}
 
@@ -490,22 +490,22 @@ authLogin(Connection *conn)
 
 	base64->reset(base64);
 	if ((rx = base64->encodeBuffer(base64, conn->input, userLen+1+userLen+1+passLen, &buffer, &conn->inputLength, 1)) != 0) {
-		syslog(LOG_ERR, TAG_FORMAT "plain Base64EncodeBuffer error rc=%d", TAG_ARGS, rx);
+		syslog(LOG_ERR, LOG_FMT "plain Base64EncodeBuffer error rc=%d", LOG_ARG, rx);
 		goto error1;
 	}
 	if (sizeof (conn->input) < conn->inputLength+3) {
-		syslog(LOG_ERR, TAG_FORMAT "AUTH PLAIN conversion too long, length=%ld", TAG_ARGS, conn->inputLength);
+		syslog(LOG_ERR, LOG_FMT "AUTH PLAIN conversion too long, length=%ld", LOG_ARG, conn->inputLength);
 		goto error2;
 	}
 
-	syslog(LOG_DEBUG, TAG_FORMAT "login=%s pass=%s", TAG_ARGS, conn->input, conn->input+userLen+1+userLen+1);
+	syslog(LOG_DEBUG, LOG_FMT "login=%s pass=%s", LOG_ARG, conn->input, conn->input+userLen+1+userLen+1);
 
-	strcpy(conn->input, "AUTH PLAIN ");
+	(void) TextCopy(conn->input, sizeof (conn->input), "AUTH PLAIN ");
 	memcpy(conn->input+sizeof("AUTH PLAIN ")-1, buffer, conn->inputLength);
 	conn->inputLength += sizeof("AUTH PLAIN ")-1;
 	conn->input[conn->inputLength] = '\0';
 
-	syslog(LOG_DEBUG, TAG_FORMAT "plain=%s", TAG_ARGS, conn->input);
+	syslog(LOG_DEBUG, LOG_FMT "plain=%s", LOG_ARG, conn->input);
 
 	rc = 0;
 error2:
@@ -525,13 +525,13 @@ smtpConnData(Connection *conn)
 	smtpConnPrint(conn, -1, "354 enter mail, end with \".\" on a line by itself\r\n");
 
 	/* Relay client's message to each SMTP server in turn. */
-	for (isDot = 0; !isDot && socketHasInput(conn->client, socketTimeout); ) {
+	for (isDot = 0; !isDot && socketHasInput(conn->client, socket_timeout); ) {
 		if ((length = socketReadLine(conn->client, conn->input, sizeof (conn->input))) < 0) {
-			syslog(LOG_ERR, TAG_FORMAT "client read error during message: %s (%d)%c", TAG_ARGS, strerror(errno), errno, length == SOCKET_EOF ? '!' : ' ');
+			syslog(LOG_ERR, LOG_FMT "client read error during message: %s (%d)%c", LOG_ARG, strerror(errno), errno, length == SOCKET_EOF ? '!' : ' ');
 			return -1;
 		}
 
-		syslog(LOG_DEBUG, TAG_FORMAT "> %s", TAG_ARGS, conn->input);
+		syslog(LOG_DEBUG, LOG_FMT "> %s", LOG_ARG, conn->input);
 
 		isDot = conn->input[0] == '.' && conn->input[1] == '\0';
 
@@ -576,21 +576,26 @@ smtpConnData(Connection *conn)
 	return 0;
 }
 
-void *
-roundhouse(void *data)
+int
+roundhouse(ServerSession *session)
 {
 	long length;
 	Connection *conn;
 	int i, code, isQuit, isData, isEhlo, serversRemaining;
 
-	conn = (Connection *) data;
-	(void) pthread_detach(pthread_self());
+	if ((conn = calloc(1, sizeof (*conn))) == NULL)
+		return -1;
+
+	session->data = conn;
+	conn->id = session->id_log;
+	conn->client = session->client;
+
 	(void) socketSetNagle(conn->client, 0);
 	(void) socketSetLinger(conn->client, 0);
 	(void) socketSetNonBlocking(conn->client, 1);
 
 	if ((conn->servers = calloc(nservers, sizeof (SOCKET))) == NULL) {
-		syslog(LOG_ERR, TAG_FORMAT "out of memory", TAG_ARGS);
+		syslog(LOG_ERR, LOG_FMT "out of memory", LOG_ARG);
 		goto error0;
 	}
 
@@ -601,10 +606,10 @@ roundhouse(void *data)
 			continue;
 
 		conn->nservers++;
-		syslog(LOG_DEBUG, TAG_FORMAT "#%d connecting to %s", TAG_ARGS, i, smtp_host[i]);
+		syslog(LOG_DEBUG, LOG_FMT "#%d connecting to %s", LOG_ARG, i, smtp_host[i]);
 
 		if (socketClient(conn->servers[i], 0)) {
-			syslog(LOG_ERR, TAG_FORMAT "#%d connection to %s failed", TAG_ARGS, i, smtp_host[i]);
+			syslog(LOG_ERR, LOG_FMT "#%d connection to %s failed", LOG_ARG, i, smtp_host[i]);
 			smtpConnDisconnect(conn, i);
 			continue;
 		}
@@ -612,7 +617,7 @@ roundhouse(void *data)
 		(void) socketSetNonBlocking(conn->servers[i], 1);
 
 		if (smtpConnGetResponse(conn, i, conn->reply, sizeof (conn->reply), &code) || code != 220) {
-			syslog(LOG_ERR, TAG_FORMAT "#%d no welcome from %s", TAG_ARGS, i, smtp_host[i]);
+			syslog(LOG_ERR, LOG_FMT "#%d no welcome from %s", LOG_ARG, i, smtp_host[i]);
 			smtpConnDisconnect(conn, i);
 			continue;
 		}
@@ -620,20 +625,20 @@ roundhouse(void *data)
 
 	if (conn->nservers <= 0) {
 		smtpConnPrint(conn, -1, "421 service temporarily unavailable\r\n");
-		syslog(LOG_ERR, TAG_FORMAT "no answer from any SMTP server", TAG_ARGS);
+		syslog(LOG_ERR, LOG_FMT "no answer from any SMTP server", LOG_ARG);
 		goto error0;
 	}
 
 	smtpConnPrint(conn, -1, "220 Welcome to " _DISPLAY "/" _VERSION "\r\n");
 
 	/* Relay client SMTP commands to each SMTP server in turn. */
-	while (socketHasInput(conn->client, socketTimeout)) {
+	while (socketHasInput(conn->client, socket_timeout)) {
 		if ((conn->inputLength = socketReadLine(conn->client, conn->input, sizeof (conn->input))) < 0) {
-			syslog(LOG_ERR, TAG_FORMAT "client read error: %s (%d)%c", TAG_ARGS, strerror(errno), errno, conn->inputLength == SOCKET_EOF ? '!' : ' ');
+			syslog(LOG_ERR, LOG_FMT "client read error: %s (%d)%c", LOG_ARG, strerror(errno), errno, conn->inputLength == SOCKET_EOF ? '!' : ' ');
 			goto error1;
 		}
 
-		syslog(LOG_DEBUG, TAG_FORMAT "> %s", TAG_ARGS, conn->input);
+		syslog(LOG_DEBUG, LOG_FMT "> %s", LOG_ARG, conn->input);
 
 		if (conn->input[0] == '\0') {
 			smtpConnPrint(conn, -1, "500 command unrecognized: \"\"\r\n");
@@ -750,186 +755,114 @@ error1:
 	for (i = 0; i < nservers; i++)
 		smtpConnDisconnect(conn, i);
 error0:
-	/* Signal EOF to client. */
-	socketClose(conn->client);
 	free(conn->servers);
 	free(conn);
 
-	return NULL;
-}
-
-/*** REMOVAL OF THIS CODE IS IN VIOLATION OF THE TERMS OF THE SOFTWARE
- *** LICENSE AS AGREED TO BY DOWNLOADING OR INSTALLING THIS SOFTWARE.
- ***/
-void *
-licenseControl(void *data)
-{
-	SMTP session;
-	char timestamp[40];
-
-	memset(&session, 0, sizeof (session));
-
-	if (smtpOpen(&session, NULL) == 0 && smtpAddRcpt(&session, "notify@milter.info") == 0) {
-		TimeStamp(&session.message_date, timestamp, sizeof (timestamp));
-		(void) smtpPrintf(&session, "To: <notify@milter.info>");
-		(void) smtpPrintf(&session, "From: " _NAME " <MAILER-DAEMON@%s>", session.helo);
-		(void) smtpPrintf(&session, "Message-ID: <" _NAME "-%s@%s>", session.id, session.helo);
-		(void) smtpPrintf(&session, "Subject: " _NAME "/" _VERSION);
-		(void) smtpPrintf(&session, "Date: %s", timestamp);
-		(void) smtpPrintf(&session, "Priority: normal");
-		(void) smtpPrintf(&session, "\r\n");
-		(void) smtpPrintf(
-			&session, "libsnert=%d.%d.%d\r\n",
-			LibSnert.major, LibSnert.minor, LibSnert.build
-		);
-
-	}
-
-	smtpClose(&session);
-
-	return NULL;
-}
-
-/*
- *
- */
-void
-ServerMain(void)
-{
-	int i;
-	pthread_t thread;
-	Connection *conn;
-	SocketAddress addr;
-	sigset_t sigpipe_set;
-	volatile unsigned short counter;
-
-	syslog(LOG_INFO, _DISPLAY "/" _VERSION " " _COPYRIGHT);
-
-	if (listener_port == NULL) {
-		syslog(LOG_ERR, "missing port number to listen on");
-		exit(2);
-	}
-
-	memset(&addr, 0, sizeof (addr));
-	i = (int) strtol(listener_port, NULL, 10);
-	addr.in.sin_addr.s_addr = htonl(INADDR_ANY);
-	addr.in.sin_port = htons((unsigned short) i);
-	addr.in.sin_family = AF_INET;
-
-	if ((listener = socketOpen(&addr, 1)) == NULL) {
-		syslog(LOG_ERR, "failed to create listener socket: %s (%d)", strerror(errno), errno);
-		exit(1);
-	}
-
-	if (socketServer(listener, 20)) {
-		syslog(LOG_ERR, "failed to listen on port %s: %s (%d)", listener_port, strerror(errno), errno);
-		socketClose(listener);
-		exit(1);
-	}
-
-	syslog(LOG_INFO, "listening on port %s", listener_port);
-
-#if defined(HAVE_SETUID)
-	/* We have to do the getpwnam() before the chroot() in order to
-	 * consult /etc/passwd, but the setuid() has to happen after the
-	 * setgid(), chroot(), and bind(), while we still have root
-	 * permissions.
-	 */
-	if (user_id != NULL && ruid == 0 && setuid(euid)) {
-		syslog(LOG_ERR, "user \"%s\" not set", user_id);
-		exit(1);
-	}
-
-	syslog(LOG_INFO, "process uid=%d gid=%d", getuid(), getgid());
-#endif
-
-	/* Assert that SIGPIPE has been blocked in this thread.
-	 * Note that we never unblock this signal, because its
-	 * simply evil in a threaded server application.
-	 */
-	(void) sigemptyset(&sigpipe_set);
-	(void) sigaddset(&sigpipe_set, SIGPIPE);
-	(void) pthread_sigmask(SIG_BLOCK, &sigpipe_set, NULL);
-
-	/* REMOVAL OF THIS CODE IS IN VIOLATION OF THE TERMS OF
-	 * THE SOFTWARE LICENSE AS AGREED TO BY DOWNLOADING OR
-	 * INSTALLING THIS SOFTWARE.
-	 */
-	(void) pthread_create(&thread, NULL, licenseControl, NULL);
-	(void) pthread_detach(thread);
-
-	/* Use "kill" to terminate the parent server process. */
-	for (counter = 0; (conn = calloc(1, sizeof (*conn))) != NULL; ) {
-		conn->client = socketAccept(listener);
-
-		if (conn->client == NULL) {
-			syslog(LOG_ERR, "socketAccept() failed: %s (%d)", strerror(errno), errno);
-			continue;
-		}
-
-		if (++counter == 0)
-			counter = 1;
-		conn->id = counter;
-
-		(void) socketAddressGetString(&conn->client->address, 0, conn->client_addr, sizeof (conn->client_addr));
-
-		syslog(LOG_INFO, "%.5u client=%d client_addr=%s", conn->id, conn->client->fd, conn->client_addr);
-
-		if (pthread_create(&thread, NULL, roundhouse, conn)) {
-			syslog(LOG_ERR, TAG_FORMAT "failed to create thread: %s, (%d)", TAG_ARGS, strerror(errno), errno);
-			socketClose(conn->client);
-			free(conn);
-		}
-	}
-
-	syslog(LOG_ERR, "unexpected error in ServerMain(): %s (%d)", strerror(errno), errno);
-	socketClose(listener);
-
-	exit(1);
+	return reportFinish(session);
 }
 
 int
-options(int argc, char **argv)
+serverMain(void)
+{
+	Server *smtp;
+	int rc, signal;
+
+	rc = EXIT_FAILURE;
+
+	syslog(LOG_INFO, _DISPLAY "/" _VERSION " " _COPYRIGHT);
+
+	if ((smtp = serverCreate(interfaces, SMTP_PORT)) == NULL)
+		goto error0;
+
+	smtp->debug.level = debug;
+	smtp->hook.session_accept = reportAccept;
+	smtp->hook.session_process = roundhouse;
+	serverSetStackSize(smtp, SERVER_STACK_SIZE);
+
+	if (serverSignalsInit(&signals))
+		goto error1;
+
+#if defined(__OpenBSD__) || defined(__FreeBSD__)
+	(void) processDumpCore(2);
+#endif
+	if (processDropPrivilages(user_id, group_id, "/tmp", 0))
+		goto error2;
+#if defined(__linux__)
+	(void) processDumpCore(1);
+#endif
+	if (serverStart(smtp))
+		goto error2;
+
+	syslog(LOG_INFO, "ready");
+	signal = serverSignalsLoop(&signals);
+
+	syslog(LOG_INFO, "signal %d, stopping sessions", signal);
+	serverStop(smtp, signal == SIGQUIT);
+	syslog(LOG_INFO, "signal %d, terminating process", signal);
+
+	rc = EXIT_SUCCESS;
+error2:
+	serverSignalsFini(&signals);
+error1:
+	serverFree(smtp);
+error0:
+	return rc;
+}
+
+void
+serverOptions(int argc, char **argv)
 {
 	int ch, i;
 
 	optind = 1;
-	while ((ch = getopt(argc, argv, "ag:p:t:u:vw")) != -1) {
+	while ((ch = getopt(argc, argv, "dqvw:u:g:t:i:")) != -1) {
 		switch (ch) {
-		case 'a':
-			application_mode = 1;
-			break;
-		case 'p':
-			listener_port = optarg;
-			break;
-		case 'v':
-			setlogmask(LOG_UPTO(LOG_DEBUG));
-			debug = 1;
-			break;
-		case 't':
-			socketTimeout = strtol(optarg, NULL, 10) * 1000;
-			break;
-		case 'w':
-			/* Windows only. */
-			install_service = 1;
-			break;
 		case 'u':
 			/* Unix only. */
 			user_id = optarg;
 			break;
+
 		case 'g':
 			/* Unix only. */
 			group_id = optarg;
 			break;
+
+		case 't':
+			socket_timeout = strtol(optarg, NULL, 10) * 1000;
+			break;
+
+		case 'i':
+			interfaces = optarg;
+			break;
+
+		case 'd':
+			daemon_mode = 0;
+			break;
+
+		case 'q':
+			server_quit++;
+			break;
+
+		case 'v':
+			setlogmask(LOG_UPTO(LOG_DEBUG));
+			debug++;
+			break;
+
+		case 'w':
+			if (strcmp(optarg, "add") == 0 || strcmp(optarg, "remove") == 0) {
+				windows_service = optarg;
+				break;
+			}
+			/*@fallthrough@*/
+
 		default:
-			syslog(LOG_ERR, "unknown command line option -%c", optopt);
-			(void) fprintf(stderr, usageMessage);
-			exit(2);
+			fprintf(stderr, usage_message);
+			exit(EX_USAGE);
 		}
 	}
 
-	if (install_service)
-		return optind;
+	if (windows_service != NULL)
+		return;
 
 	for (i = nservers; optind < argc && nservers < MAX_ARGV_LENGTH; optind++, i++) {
 		smtp_host[i] = argv[optind];
@@ -941,11 +874,9 @@ options(int argc, char **argv)
 	}
 
 	nservers = i;
-
-	return optind;
 }
 
-int
+void
 loadCf(char *cf)
 {
 	int ac;
@@ -953,36 +884,267 @@ loadCf(char *cf)
 	static char *buffer = NULL;
 	char *av[MAX_ARGV_LENGTH+1];
 
+	/* This buffer is not freed until the program exits. */
+	if (buffer == NULL && (buffer = malloc(BUFSIZ)) == NULL)
+		return;
+
 	/* Load and parse the options file, if present. */
 	if ((fp = fopen(cf, "r")) != NULL) {
-		/* This buffer is not freed until the program exits. */
-		if (buffer == NULL && (buffer = malloc(BUFSIZ)) == NULL)
-			goto error0;
-
-		if ((ac = fread(buffer, 1, BUFSIZ-1, fp)) < 0)
-			goto error0;
+		if (0 < (ac = fread(buffer, 1, BUFSIZ-1, fp))) {
+			buffer[ac] = '\0';
+			ac = TokenSplitA(buffer, NULL, av+1, MAX_ARGV_LENGTH)+1;
+			serverOptions(ac, av);
+		}
 
 		(void) fclose(fp);
+	}
+}
 
-		buffer[ac] = '\0';
-		ac = TokenSplitA(buffer, NULL, av+1, MAX_ARGV_LENGTH)+1;
-		options(ac, av);
+# ifdef __unix__
+/***********************************************************************
+ *** Unix Daemon
+ ***********************************************************************/
+
+# ifdef HAVE_UNISTD_H
+#  include <unistd.h>
+# endif
+
+#include <com/snert/lib/sys/pid.h>
+
+void
+atExitCleanUp(void)
+{
+	(void) unlink(PID_FILE);
+	closelog();
+}
+
+int
+main(int argc, char **argv)
+{
+	loadCf(CF_FILE);
+	serverOptions(argc, argv);
+	LogSetProgramName(_NAME);
+
+	if (argc <= optind) {
+		fprintf(stderr, usage_message);
+		return EX_USAGE;
 	}
 
-	return 0;
-error0:
-	(void) fclose(fp);
+	switch (server_quit) {
+	case 1:
+		/* Slow quit	-q */
+		exit(pidKill(PID_FILE, SIGQUIT) != 0);
 
-	return -1;
+	case 2:
+		/* Quit now	-q -q */
+		exit(pidKill(PID_FILE, SIGTERM) != 0);
+
+	default:
+		/* Restart	-q -q -q
+		 * Restart-If	-q -q -q -q
+		 */
+		if (pidKill(PID_FILE, SIGTERM) && 3 < server_quit) {
+			fprintf(stderr, "no previous instance running: %s (%d)\n", strerror(errno), errno);
+			return EXIT_FAILURE;
+		}
+
+		sleep(2);
+	}
+
+	if (daemon_mode) {
+		pid_t ppid;
+		int pid_fd;
+
+		openlog(_NAME, LOG_PID|LOG_NDELAY, LOG_USER);
+		setlogmask(LOG_UPTO(LOG_DEBUG));
+
+		if ((ppid = fork()) < 0) {
+			syslog(LOG_ERR, log_init, SERVER_FILE_LINENO, strerror(errno), errno);
+			return EX_OSERR;
+		}
+
+		if (ppid != 0)
+			return EXIT_SUCCESS;
+
+		if (setsid() == -1) {
+			syslog(LOG_ERR, log_init, SERVER_FILE_LINENO, strerror(errno), errno);
+			return EX_OSERR;
+		}
+
+		if (atexit(atExitCleanUp)) {
+			syslog(LOG_ERR, log_init, SERVER_FILE_LINENO, strerror(errno), errno);
+			return EX_SOFTWARE;
+		}
+
+		if (pidSave(PID_FILE)) {
+			syslog(LOG_ERR, log_init, SERVER_FILE_LINENO, strerror(errno), errno);
+			return EX_SOFTWARE;
+		}
+
+		if ((pid_fd = pidLock(PID_FILE)) < 0) {
+			syslog(LOG_ERR, log_init, SERVER_FILE_LINENO, strerror(errno), errno);
+			return EX_SOFTWARE;
+		}
+	} else {
+		LogOpen("(standard error)");
+		LogSetLevel(LOG_PRI(LOG_DEBUG));
+	}
+
+	return serverMain();
 }
+# endif /* __unix__ */
+
+# ifdef __WIN32__
+
+#  include <com/snert/lib/sys/winService.h>
+
+/***********************************************************************
+ *** Windows Logging
+ ***********************************************************************/
+
+static HANDLE eventLog;
+
+void
+ReportInit(void)
+{
+	eventLog = RegisterEventSource(NULL, _NAME);
+}
+
+void
+ReportLogV(int type, char *fmt, va_list args)
+{
+	LPCTSTR strings[1];
+	char message[1024];
+
+	strings[0] = message;
+	(void) vsnprintf(message, sizeof (message), fmt, args);
+
+	ReportEvent(
+		eventLog,	// handle of event source
+		type,		// event type
+		0,		// event category
+		0,		// event ID
+		NULL,		// current user's SID
+		1,		// strings in lpszStrings
+		0,		// no bytes of raw data
+		strings,	// array of error strings
+		NULL		// no raw data
+	);
+}
+
+void
+ReportLog(int type, char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	ReportLogV(type, fmt, args);
+	va_end(args);
+}
+
+static DWORD strerror_tls = TLS_OUT_OF_INDEXES;
+static const char unknown_error[] = "(unknown error)";
+
+char *
+strerror(int error_code)
+{
+	char *error_string;
+
+	if (strerror_tls == TLS_OUT_OF_INDEXES) {
+		strerror_tls = TlsAlloc();
+		if (strerror_tls == TLS_OUT_OF_INDEXES)
+			return (char *) unknown_error;
+	}
+
+	error_string = (char *) TlsGetValue(strerror_tls);
+	LocalFree(error_string);
+
+	FormatMessage(
+		FORMAT_MESSAGE_ALLOCATE_BUFFER |
+		FORMAT_MESSAGE_FROM_SYSTEM |
+		FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL, error_code,
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		(LPTSTR) &error_string, 0, NULL
+	);
+
+	if (!TlsSetValue(strerror_tls, error_string)) {
+		LocalFree(error_string);
+		return (char *) unknown_error;
+	}
+
+	return error_string;
+}
+
+void
+freeThreadData(void)
+{
+	if (strerror_tls != TLS_OUT_OF_INDEXES) {
+		char *error_string = (char *) TlsGetValue(strerror_tls);
+		LocalFree(error_string);
+	}
+}
+
+/***********************************************************************
+ *** Windows Service
+ ***********************************************************************/
+
+#define QUIT_EVENT_NAME		"Global\\" _NAME "-quit"
+
+int
+main(int argc, char **argv)
+{
+	/* Get this now so we can use the event log. */
+	ReportInit();
+
+	loadCf(CF_FILE);
+	serverOptions(argc, argv);
+
+	if (server_quit) {
+		HANDLE signal_quit = OpenEvent(EVENT_MODIFY_STATE , 0, QUIT_EVENT_NAME);
+		if (signal_quit == NULL) {
+			ReportLog(EVENTLOG_ERROR_TYPE, "service %s quit error: %s (%d)", _NAME, strerror(errno), errno);
+			exit(EX_OSERR);
+		}
+
+		SetEvent(signal_quit);
+		CloseHandle(signal_quit);
+		exit(EXIT_SUCCESS);
+	}
+
+	if (windows_service != NULL) {
+		if (winServiceInstall(*windows_service == 'a', _NAME, NULL) < 0) {
+			ReportLog(EVENTLOG_ERROR_TYPE, "service %s %s error: %s (%d)", _NAME, windows_service, strerror(errno), errno);
+			return EX_OSERR;
+		}
+		return EXIT_SUCCESS;
+	}
+
+	if (daemon_mode) {
+		winServiceSetSignals(&signals);
+		if (winServiceStart(_NAME, argc, argv) < 0) {
+			ReportLog(EVENTLOG_ERROR_TYPE, "service %s start error: %s (%d)", _NAME, strerror(errno), errno);
+			return EX_OSERR;
+		}
+		return EXIT_SUCCESS;
+	}
+
+	return serverMain();
+}
+
+# endif /* __WIN32__ */
+
+
+
+
+
+
+#ifdef OLD
 
 #if defined(__WIN32__)
 /***********************************************************************
  *** Windows Service Framework
  ***********************************************************************/
-
-#undef CF_FILE
-#define CF_FILE			_NAME ".cf"
 
 static HANDLE eventLog;
 static char *server_root = NULL;
@@ -1346,7 +1508,7 @@ main(int argc, char **argv)
 
 	if (nservers <= 0) {
 		syslog(LOG_ERR, "missing server arguments");
-		(void) fprintf(stderr, usageMessage);
+		(void) fprintf(stderr, usage_message);
 		exit(2);
 	}
 
@@ -1457,3 +1619,5 @@ main(int argc, char **argv)
 	return 0;
 }
 #endif /* __unix__ */
+
+#endif /* OLD */
