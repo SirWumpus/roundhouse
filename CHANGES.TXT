@@ -22,16 +22,13 @@ is no set schedule for releases.
 
    !	Removed process fork compile option and relevent code.
 
-   !	Changed the command line options. Replaced -p port with -i a
-	list of ip:port to bind. Replaced -a by -d. Changed -w to take
-	an argument. Added -q.
-
    !	Converted to use LibSnert net/server and sys/winService APIs.
    	This is more efficient as it uses a pre-spawned pool of server
    	threads. It also brings with it IPv6 support.
 
-   !	Changed the command line options. Replaced -p with -i. Replaced
-   	-a by -d. Added -q and changed -w.
+   !	Changed the command line options. Replaced -p port with -i a
+	list of ip:port to bind. Replaced -a by -d. Changed -w to take
+	an argument. Added -q.
 
    !	Removed phone home code.
 
