@@ -1,7 +1,7 @@
 /*
  * roundhouse.c
  *
- * Copyright 2005, 2012 by Anthony Howe. All rights reserved.
+ * Copyright 2005, 2013 by Anthony Howe. All rights reserved.
  *
  *
  * From http://www.answers.com/roundhouse&r=67
@@ -327,12 +327,12 @@ proxyStream(void *data)
 	(void) pthread_detach(pthread_self());
 
 	while (socketHasInput(stream->source, socket_timeout)) {
-		if (socketRead(stream->source, conn->input, sizeof (conn->input)) < 0) {
+		if (socketRead(stream->source, (unsigned char*)conn->input, sizeof (conn->input)) < 0) {
 			syslog(LOG_ERR, LOG_FMT "proxyStream() read error: %s (%d)", LOG_ARG, strerror(errno), errno);
 			break;
 		}
 
-		if (socketWrite(stream->sink, conn->input, sizeof (conn->input)) < 0) {
+		if (socketWrite(stream->sink, (unsigned char*)conn->input, sizeof (conn->input)) < 0) {
 			syslog(LOG_ERR, LOG_FMT "proxyStream() write error: %s (%d)", LOG_ARG, strerror(errno), errno);
 			break;
 		}
