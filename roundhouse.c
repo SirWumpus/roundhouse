@@ -844,7 +844,6 @@ serverOptions(int argc, char **argv)
 			break;
 
 		case 'v':
-			setlogmask(LOG_UPTO(LOG_DEBUG));
 			debug++;
 			break;
 
@@ -982,7 +981,7 @@ main(int argc, char **argv)
 		}
 	} else {
 		LogOpen("(standard error)");
-		LogSetLevel(LOG_PRI(LOG_DEBUG));
+		LogSetLevel(LOG_UPTO(LOG_DEBUG));
 	}
 
 	return serverMain();
