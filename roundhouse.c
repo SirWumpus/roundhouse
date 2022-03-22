@@ -283,6 +283,7 @@ smtpConnGetResponse(Connection *conn, int index, char *line, long size, int *cod
 		 */
 		line[0] = line[1] = line[2] = line[4] = '\0';
 
+		errno = 0;
 		switch (length = socketReadLine(s, line, size)) {
 		case SOCKET_ERROR:
 			syslog(LOG_ERR, LOG_FMT "read error: %s (%d)", LOG_ARG, strerror(errno), errno);
@@ -551,9 +552,7 @@ smtpConnData(Connection *conn)
 			}
 
 			if (isDot) {
-				(void) smtpConnGetResponse(conn, i, conn->reply, sizeof (conn->reply), &code);
-
-				if (errno != 0) {
+				if (smtpConnGetResponse(conn, i, conn->reply, sizeof (conn->reply), &code) != 0) {
 					smtpConnDisconnect(conn, i);
 					continue;
 				}
@@ -690,10 +689,9 @@ roundhouse(ServerSession *session)
 			if (isQuit)
 				continue;
 
-			(void) smtpConnGetResponse(conn, i, conn->reply, sizeof (conn->reply), &code);
-
-			if (errno != 0)
+			if (smtpConnGetResponse(conn, i, conn->reply, sizeof (conn->reply), &code) != 0) {
 				smtpConnDisconnect(conn, i);
+			}
 
 			/* When a SMTP server rejects the client's
 			 * most recent command, then close the
