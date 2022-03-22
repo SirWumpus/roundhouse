@@ -14,6 +14,18 @@ is no set schedule for releases.
    +	Consider adding man-in-middle support for STARTTLS.
 
 
+--0.6.1--
+
+   *	Recommend LibSnert 1.76.0+
+
+   !	Remove check for excess options.
+
+   !	Fix console debug logging.
+
+   !	Fix downstream server response handling, avoid errno and use
+	smtpConnGetResponse() return value.
+
+
 --0.6.0--
 
    *	Requires LibSnert 1.75.11
