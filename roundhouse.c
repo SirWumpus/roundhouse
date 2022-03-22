@@ -925,11 +925,6 @@ main(int argc, char **argv)
 	serverOptions(argc, argv);
 	LogSetProgramName(_NAME);
 
-	if (argc <= optind) {
-		fprintf(stderr, usage_message);
-		return EX_USAGE;
-	}
-
 	switch (server_quit) {
 	case 1:
 		/* Slow quit	-q */
