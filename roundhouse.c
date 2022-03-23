@@ -16,8 +16,6 @@
  * Description
  * -----------
  *
- * 	roundhouse [-v][-p port] server ...
- *
  * A specialised SMTP proxy server intended to accept mail on port 25 and
  * copy the client input to each SMTP server (unix domain socket or internet
  * host,port) specified.
@@ -104,6 +102,7 @@
 
 #include <com/snert/lib/io/Log.h>
 #include <com/snert/lib/io/socket2.h>
+#include <com/snert/lib/io/socket3.h>
 #include <com/snert/lib/mail/limits.h>
 #include <com/snert/lib/mail/parsePath.h>
 #include <com/snert/lib/net/server.h>
@@ -130,9 +129,12 @@
 #define LOG_FMT		"%s "
 #define LOG_ARG		conn->id
 
-static const char log_oom[] = "out of memory %s(%d)";
+#ifndef KEY_CRT_PEM
+#define KEY_CRT_PEM	NULL
+#endif
+
+static const char log_io[] = "socket error %s(%d): %s (%d)";
 static const char log_init[] = "init error %s(%d): %s (%d)";
-static const char log_internal[] = "internal error %s(%d): %s (%d)";
 
 /***********************************************************************
  *** Global Variables
@@ -171,24 +173,44 @@ static SocketAddress *servers[MAX_ARGV_LENGTH];
 
 static ServerSignals signals;
 
+static char *ca_chain;
+static char *cert_dir;
+static char *key_crt_pem = KEY_CRT_PEM;
+static char *key_pass = NULL;
+
+#ifdef HAVE_OPENSSL_SSL_H
+# define GETOPT_TLS	"c:C:k:K:"
+#else
+# define GETOPT_TLS
+#endif
+
 static char *usage_message =
-"usage: " _NAME " [-dqv][-i ip,...][-t timeout] \\\n"
-"       [-u name][-g name][-w add|remove] server ...\n"
+"usage: " _NAME " [-dqv][-i ip,...][-t timeout][-u name][-g name]\n"
+#ifdef HAVE_OPENSSL_SSL_H
+"       [-c ca_pem][-C ca_dir][-k key_crt_pem][-K key_pass]\n"
+#endif
+"       [-w add|remove] server ...\n"
 "\n"
+#ifdef HAVE_OPENSSL_SSL_H
+"-c ca_pem\tCertificate Authority root certificate chain file\n"
+"-C dir\t\tCertificate Authority root certificate directory\n"
+#endif
 "-d\t\tdisable daemon mode and run as a foreground application\n"
 "-g name\t\trun as this group\n"
 "-i ip,...\tcomma separated list of IPv4 or IPv6 addresses and\n"
 "\t\toptional :port number to listen on for SMTP connections;\n"
 "\t\tdefault is \"[::0]:25,0.0.0.0:25\"\n"
+#ifdef HAVE_OPENSSL_SSL_H
+"-k key_crt_pem\tprivate key and certificate chain file\n"
+"-K key_pass\tpassword for private key; default no password\n"
+#endif
 "-q\t\tx1 slow quit, x2 quit now, x3 restart, x4 restart-if\n"
 "-t timeout\tclient socket timeout in seconds, default 300\n"
 "-u name\t\trun as this user\n"
 "-v\t\tverbose maillog output\n"
-"-w add|remove\tadd or remove Windows service\n"
+"-w add|remove\tadd or remove Windows service; ignored on unix\n"
 "\n"
-"server\t\ta unix domain socket path or host[:port] specifier. The\n"
-"\t\tfirst server specified is the primary host that can handle\n"
-"\t\tSMTP STARTTLS.\n"
+"server\t\thost[:port] specifier.\n"
 "\n"
 _NAME " " _VERSION " " _COPYRIGHT "\n"
 ;
@@ -659,18 +681,26 @@ roundhouse(ServerSession *session)
 			continue;
 		}
 
-		/* We cannot multiplex STARTTLS command at this time, so
-		 * we only deliver it to the primary mail server (first
-		 * one specified).
-		 *
-		 * If there was an error setting up the proxy, we should
-		 * be able to continue to multiplex a non-TLS connection;
-		 * otherwise we're done.
-		 */
 		if (0 < TextInsensitiveStartsWith(conn->input, "STARTTLS")) {
-			if (proxyTLS(conn))
+			if (socket3_is_tls(conn->client->fd)) {
+				(void) smtpConnPrint(conn, -1, "503 TLS already started\r\n");
 				continue;
-			break;
+			}
+
+			syslog(LOG_INFO, "starting TLS...");
+
+			if (socket3_start_tls(conn->client->fd, SOCKET3_SERVER_TLS, socket_timeout)) {
+				syslog(LOG_ERR, log_io, SERVER_FILE_LINENO, strerror(errno), errno);
+				(void) smtpConnPrint(conn, -1, "454 TLS not available\r\n");
+				continue;
+			}
+
+			syslog(LOG_INFO, "TLS started");
+
+			if (smtpConnPrint(conn, -1, "220 OK\r\n") < 0) {
+				break;
+			}
+			continue;
 		}
 
 		if (0 < TextInsensitiveStartsWith(conn->input, "AUTH LOGIN") && authLogin(conn))
@@ -707,7 +737,7 @@ roundhouse(ServerSession *session)
 			if (smtpConnGetResponse(conn, i, conn->reply, sizeof (conn->reply), &code) != 0) {
 				smtpConnDisconnect(conn, i);
 			}
-
+#ifdef OFF
 			/* When a SMTP server rejects the client's
 			 * most recent command, then close the
 			 * session with that server, since we can't
@@ -718,7 +748,7 @@ roundhouse(ServerSession *session)
 				smtpConnPrint(conn, i, "QUIT\r\n");
 				smtpConnDisconnect(conn, i);
 			}
-
+#endif
 			else if (code == 354)
 				isData++;
 		}
@@ -784,8 +814,26 @@ serverMain(void)
 
 	syslog(LOG_INFO, _DISPLAY "/" _VERSION " " _COPYRIGHT);
 
-	if ((smtp = serverCreate(interfaces, SMTP_PORT)) == NULL)
+	if (socket3_init_tls()) {
+		syslog(LOG_ERR, "socket3_init_tls() failed");
 		goto error0;
+	}
+	if ((cert_dir != NULL || ca_chain != NULL) && socket3_set_ca_certs(cert_dir, ca_chain)) {
+		syslog(LOG_ERR, "socket3_set_ca_certs() failed");
+		goto error1;
+	}
+#ifdef HAVE_OPENSSL_SSL_H
+	if (key_crt_pem == NULL) {
+		syslog(LOG_WARN, "missing server private key and certificate file; see -k option");
+	} else
+#endif
+	if (socket3_set_cert_key_chain(key_crt_pem, key_pass)) {
+		syslog(LOG_ERR, log_init, SERVER_FILE_LINENO, strerror(errno), errno);
+		goto error1;
+	}
+
+	if ((smtp = serverCreate(interfaces, SMTP_PORT)) == NULL)
+		goto error1;
 
 	smtp->debug.level = debug;
 	smtp->hook.session_accept = reportAccept;
@@ -793,18 +841,18 @@ serverMain(void)
 	serverSetStackSize(smtp, SERVER_STACK_SIZE);
 
 	if (serverSignalsInit(&signals))
-		goto error1;
+		goto error2;
 
 #if defined(__OpenBSD__) || defined(__FreeBSD__)
 	(void) processDumpCore(2);
 #endif
 	if (processDropPrivilages(user_id, group_id, "/tmp", 0))
-		goto error2;
+		goto error3;
 #if defined(__linux__)
 	(void) processDumpCore(1);
 #endif
 	if (serverStart(smtp))
-		goto error2;
+		goto error3;
 
 	syslog(LOG_INFO, "ready");
 	signal = serverSignalsLoop(&signals);
@@ -814,10 +862,12 @@ serverMain(void)
 	syslog(LOG_INFO, "signal %d, terminating process", signal);
 
 	rc = EXIT_SUCCESS;
-error2:
+error3:
 	serverSignalsFini(&signals);
-error1:
+error2:
 	serverFree(smtp);
+error1:
+	socket3_fini();
 error0:
 	return rc;
 }
@@ -828,8 +878,22 @@ serverOptions(int argc, char **argv)
 	int ch, i;
 
 	optind = 1;
-	while ((ch = getopt(argc, argv, "dqvw:u:g:t:i:")) != -1) {
+	while ((ch = getopt(argc, argv, "dqvw:u:g:t:i:" GETOPT_TLS)) != -1) {
 		switch (ch) {
+#ifdef HAVE_OPENSSL_SSL_H
+		case 'c':
+			ca_chain = optarg;
+			break;
+		case 'C':
+			cert_dir = optarg;
+			break;
+		case 'k':
+			key_crt_pem = optarg;
+			break;
+		case 'K':
+			key_pass = optarg;
+			break;
+#endif
 		case 'u':
 			/* Unix only. */
 			user_id = optarg;

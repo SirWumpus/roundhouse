@@ -17,7 +17,6 @@ RUN_USER	= @enable_run_user@
 RUN_GROUP	= @enable_run_group@
 prefix		= @prefix@
 exec_prefix	= @exec_prefix@
-PROGRAM		= @executable@
 
 ########################################################################
 ### No further configuration beyond this point.
@@ -27,6 +26,7 @@ PROGRAM		= @executable@
 A = .@LIBEXT@
 O = .@OBJEXT@
 E = @EXEEXT@
+.SUFFIXES : .c $O $E $A
 
 #
 # Paths for supporting headers and libraries.
@@ -60,22 +60,21 @@ LIBSNERT 	:= @LIBSNERT@
 LIB_RT 		:= @HAVE_LIB_RT@
 LIB_SEM		:= @HAVE_LIB_SEM@
 
+LIBS_SSL	:= @LIBS_SSL@
+CFLAGS_SSL	:= @CFLAGS_SSL@
+LDFLAGS_SSL	:= @LDFLAGS_SSL@
+
 LIB_PTHREAD	:= @HAVE_LIB_PTHREAD@
 CFLAGS_PTHREAD	:= @CFLAGS_PTHREAD@
 LDFLAGS_PTHREAD	:= @LDFLAGS_PTHREAD@
 
-CFLAGS		:= @CFLAGS@
-LDFLAGS		:= @LDFLAGS@
-LIBS		:= @LIBS@
+CFLAGS		:= ${CFLAGS_SSL} @CFLAGS@
+LDFLAGS		:= ${LDFLAGS_SSL} @LDFLAGS@
+LIBS		:= @LIBS@ ${LIBS_SSL}
 
 ########################################################################
 ### No further configuration beyond this point.
 ########################################################################
-
-.SUFFIXES :
-O = .@OBJEXT@
-E = @EXEEXT@
-.SUFFIXES : .c $O $E
 
 .MAIN : build
 

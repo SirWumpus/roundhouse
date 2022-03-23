@@ -2,7 +2,7 @@
 #	Thus it begins...
 #######################################################################
 
-AC_INIT(roundhouse, 0.6, [Anthony Howe <achowe@snert.com>])
+AC_INIT(roundhouse, 0.7, [Anthony Howe <achowe@snert.com>])
 
 dnl The autoconf version I learned to deal with.
 AC_PREREQ(2.57)
@@ -14,6 +14,13 @@ AC_DEFINE_UNQUOTED(_PLATFORM, [["${platform}"]])
 AC_SUBST(rel_incdir, '../../include')
 AC_SUBST(rel_libdir, '../../lib')
 AC_SUBST(rel_tardir, '../../../..')
+
+#######################################################################
+#	Setup paths
+#######################################################################
+
+# The total perspective vortex "You are here..."
+AC_CONFIG_SRCDIR($PACKAGE_TARNAME.c)
 
 #######################################################################
 #	Auxliary files to be modified later
@@ -80,6 +87,10 @@ if test -f '../lib/version.sh' ; then
 	AC_SUBST(HAVE_LIB_WS2_32)
 	AC_SUBST(HAVE_LIB_IPHLPAPI)
 
+	AC_SUBST(CFLAGS_SSL)
+	AC_SUBST(LDFLAGS_SSL)
+	AC_SUBST(LIBS_SSL)
+
 	expr "${CFLAGS}" : '.*-pthread' >/dev/null ;
 	has_freebsd_pthread=$?
 	if test "${HAVE_LIB_PTHREAD:-no}" = 'no' -a "${CFLAGS_PTHREAD:-no}" = 'no' -a "${ENABLE_MINGW:-no}" = 'no'; then
@@ -121,7 +132,7 @@ AC_MSG_RESULT([  Platform..........: $platform])
 AC_MSG_RESULT([  prefix............: $prefix])
 AC_MSG_RESULT([  exec_prefix.......: $exec_prefix])
 AC_MSG_RESULT([  sbindir...........: $sbindir])
-AC_MSG_RESULT([  CFLAGS............: $CFLAGS])
-AC_MSG_RESULT([  LDFLAGS...........: $LDFLAGS])
-AC_MSG_RESULT([  LIBS..............: $LIBS])
+AC_MSG_RESULT([  CFLAGS............: $CFLAGS $CFLAGS_SSL])
+AC_MSG_RESULT([  LDFLAGS...........: $LDFLAGS $LDFLAGS_SSL])
+AC_MSG_RESULT([  LIBS..............: $LIBS $LIBS_SSL])
 echo

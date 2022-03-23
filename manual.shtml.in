@@ -35,21 +35,21 @@ SnertSoft - @PACKAGE_NAME@/@PACKAGE_VERSION@ (beta) for Sendmail
 <blockquote>
 <table border="0" cellspacing="0" cellpadding="2" width="100%">
 <tr>
-	<td valign="top">
-		<br/>
-		A roundhouse is a maintenance facility used by railroads. Roundhouses
-		are the large, circular or semicircular structures that are located
-		surrounding or adjacent to turntables. The roundhouse in a railroad
-		yard is typically where steam locomotives were stored when they
-		weren't in use.
+    <td valign="top">
+        <br/>
+        A roundhouse is a maintenance facility used by railroads. Roundhouses
+        are the large, circular or semicircular structures that are located
+        surrounding or adjacent to turntables. The roundhouse in a railroad
+        yard is typically where steam locomotives were stored when they
+        weren't in use.
 
-		<p class="small">-
-		<a href="http://www.answers.com/roundhouse&r=67">
-		answers.com</a>
-		</p>
-	</td>
-	<td>&nbsp;&nbsp;&nbsp;</td>
-	<td><img src="Img/Locomotives-Roundhouse-265x204.png" width="265" height="204" border="1"></td>
+        <p class="small">-
+        <a href="http://www.answers.com/roundhouse&r=67">
+        answers.com</a>
+        </p>
+    </td>
+    <td>&nbsp;&nbsp;&nbsp;</td>
+    <td><img src="Img/Locomotives-Roundhouse-265x204.png" width="265" height="204" border="1"></td>
 </tr>
 </table>
 </blockquote>
@@ -58,7 +58,7 @@ SnertSoft - @PACKAGE_NAME@/@PACKAGE_VERSION@ (beta) for Sendmail
 <h3>Description</h3>
 
 <p>This is an SMTP multiplexer, which takes the input from an SMTP client connection
-and copies it to one or more SMTP servers. 
+and copies it to one or more SMTP servers.
 Intended as means to debug and test different mail server configurations
 using a production mail server's live data stream.
 </p>
@@ -68,18 +68,33 @@ using a production mail server's live data stream.
 
 <blockquote style="text-align: left;">
 <code>@PACKAGE_NAME@</code>
-<nobr>[<span class="syntax">-avw</span>]</nobr>
+<nobr>[<span class="syntax">-dqv</span>]</nobr>
+<nobr>[<span class="syntax">-c</span> <span class="param">ca_pem</span>]</nobr>
+<nobr>[<span class="syntax">-C</span> <span class="param">ca_dir</span>]</nobr>
 <nobr>[<span class="syntax">-g</span> <span class="param">group</span>]</nobr>
-<nobr>[<span class="syntax">-p</span> <span class="param">port</span>]</nobr>
+<nobr>[<span class="syntax">-i</span> <span class="param">ip,...</span>]</nobr>
+<nobr>[<span class="syntax">-k</span> <span class="param">key_crt_pem</span>]</nobr>
+<nobr>[<span class="syntax">-K</span> <span class="param">key_pass</span>]</nobr>
 <nobr>[<span class="syntax">-t</span> <span class="param">timeout</span>]</nobr>
 <nobr>[<span class="syntax">-u</span> <span class="param">user</span>]</nobr>
-<span class="param">server ...</span>
+<nobr>[<span class="syntax">-w</span> <span class="param">add|remove</span>]</nobr>
+<nobr><span class="param">server ...</span></nobr>
 
 </blockquote>
 
 <dl>
+<a name="CaFile"></a>
+<dt><span class="syntax">-c</span> <span class="param">ca_pem</span></dt>
+<dd>Certificate Authority root certificate chain file.
+</dd>
+
+<a name="CaDir"></a>
+<dt><span class="syntax">-C</span> <span class="param">ca_dir</span></dt>
+<dd>Certificate Authority root certificate directory.
+</dd>
+
 <a name="DaemonMode"></a>
-<dt><span class="syntax">-a</span></dt>
+<dt><span class="syntax">-d</span></dt>
 <dd>Run as a foreground application and log to standard error.
 The default is to start as a daemon or service in the background.
 </dd>
@@ -89,9 +104,27 @@ The default is to start as a daemon or service in the background.
 <dd>Run as this group. Only root can specify this. Ignored on Windows.
 </dd>
 
-<a name="ServerPort"></a>
-<dt><span class="syntax">-p</span> <span class="param">port</span></dt>
-<dd>The port the server listens on. The default is 25.
+<a name="Interfaces"></a>
+<dt><span class="syntax">-i</span> <span class="param">ip,...</span></dt>
+<dd>
+Comma separated list of IPv4 or IPv6 addresses and
+optional :port number to listen on for SMTP connections;
+default is <span class="param">[::0]:25,0.0.0.0:25</span>.
+</dd>
+
+<a name="KeyCrtPem"></a>
+<dt><span class="syntax">-k</span> <span class="param">key_crt_pem</span></dt>
+<dd>Private key and certificate chain file.
+</dd>
+
+<a name="KeyPass"></a>
+<dt><span class="syntax">-K</span> <span class="param">key_pass</span></dt>
+<dd>Password for private key; default no password.
+</dd>
+
+<a name="Quit"></a>
+<dt><span class="syntax">-q</span></dt>
+<dd>x1 slow quit, x2 quit now, x3 restart, x4 restart-if.
 </dd>
 
 <a name="SocketTimeout"></a>
@@ -108,19 +141,18 @@ servers specified.
 
 <a name="Debug"></a>
 <dt><span class="syntax">-v</span></dt>
-<dd>Enable verbose debug log messages. 
+<dd>Enable verbose debug log messages.
 <!-- As a Windows service, this will log lots of information in the Windows' Events log. -->
 </dd>
 
 <a name="Windows"></a>
-<dt><span class="syntax">-w</span></dt>
-<dd>Toggle add/remove Windows service. For Unix this is a no-op.
+<dt><span class="syntax">-w</span> <span class="param">add|remove</span></dt>
+<dd>Add or remove Windows service; ignored on unix.
 </dd>
 
 <dt><span class="syntax">server ...</span></dt>
 <dd>
 One or more SMTP servers specified as a unix domain socket path or as a host[,port] specifier.
-The first server specified is the primary SMTP server used exclusively for STARTTLS connections.
 </dd>
 
 </dl>
@@ -143,14 +175,14 @@ Download:
 <blockquote>
 <table border="0" cellspacing="0" cellpadding="2" width="100%">
 <tr>
-	<td class="tline bline"><a href="http://www.snertsoft.com/download/@PACKAGE_NAME@-@PACKAGE_VERSION@.tar.gz">@PACKAGE_NAME@/@PACKAGE_VERSION@</a></td>
-	<td class="tline bline"><a href="@PACKAGE_NAME@.md5">md5sum</a></td>
-	<td class="tline bline"><a href="CHANGES.TXT">Change Log</a></td>
+    <td class="tline bline"><a href="http://www.snertsoft.com/download/@PACKAGE_NAME@-@PACKAGE_VERSION@.tar.gz">@PACKAGE_NAME@/@PACKAGE_VERSION@</a></td>
+    <td class="tline bline"><a href="@PACKAGE_NAME@.md5">md5sum</a></td>
+    <td class="tline bline"><a href="CHANGES.TXT">Change Log</a></td>
 </tr>
 <tr>
-	<td class="bline"><a href="http://www.snertsoft.com/download/libsnert-current.tar.gz">LibSnert</a></td>
-	<td class="bline"><a href="@PACKAGE_NAME@.md5">md5sum</a></td>
-	<td class="bline"><a href="CHANGES-LIBSNERT.TXT">Change Log</a></td>
+    <td class="bline"><a href="http://www.snertsoft.com/download/libsnert-current.tar.gz">LibSnert</a></td>
+    <td class="bline"><a href="@PACKAGE_NAME@.md5">md5sum</a></td>
+    <td class="bline"><a href="CHANGES-LIBSNERT.TXT">Change Log</a></td>
 </tr>
 </table>
 </blockquote>
@@ -174,32 +206,21 @@ Currently tested platforms:
 
 <li><p>
 When using Roundhouse on the same server as two or more Sendmail daemons,
-each Sendmail instance must be listening on a port other than 25, which 
+each Sendmail instance must be listening on a port other than 25, which
 Roundhouse will be listening on. Either modify each daemon's sendmail.mc/cf
 file or specify the command line option -ODaemonPortOptions=Port=NNN. For example:
 </p>
 <blockquote><pre>
-	# sendmail -ODaemonPortOptions=Port=26
-	# sendmail -ODaemonPortOptions=Port=27	
+    # sendmail -ODaemonPortOptions=Port=26
+    # sendmail -ODaemonPortOptions=Port=27
 </pre></blockquote>
 <p>
 Then start Roundhouse to multiplex to the two local Sendmail daemons:
 </p>
 <blockquote><pre>
-	# roundhouse 127.0.0.1:26 ::1,27 other.host.example.com
+    # roundhouse 127.0.0.1:26 [::1]:27 other.host.example.com
 </pre></blockquote>
-<p>
-Note that Roundhouse supports IPv6 addresses, but in order to distinguish
-between the address and the port, a comma or other punctuation character
-must be used instead of a colon. 
-</p>
 </li>
-
-<li><p>
-Roundhouse does not currently multiplex STARTTLS sessions. Instead
-it forwards the STARTTLS and the remainder of the input stream to the first
-SMTP server in the server list. This should be your primary SMTP server.
-</p>
 
 <li><p>
 Roundhouse supports AUTH PLAIN and AUTH LOGIN. An AUTH LOGIN is converted
@@ -228,22 +249,22 @@ AGREEMENT.
 </p>
 <ol>
 <li><h4>Definitions</h4>
-	<ol>
-	<li><p>
-	``Package'' means the identified above in source and/or binary
-	form, any other machine readable materials provided (including,
-	but not limited to documentation, sample files, data files),
-	any updates or error corrections, and its derivative works.
-	</p></li>
-	<li><p>
+    <ol>
+    <li><p>
+    ``Package'' means the identified above in source and/or binary
+    form, any other machine readable materials provided (including,
+    but not limited to documentation, sample files, data files),
+    any updates or error corrections, and its derivative works.
+    </p></li>
+    <li><p>
     ``Private Individual'' means an individual using the Package for
      personal, private, and non-commercial use only.
-	</p></li>
-	<li><p>
+    </p></li>
+    <li><p>
     ``Organisation'' means a legal entity or an individual that does
      not qualify as a Private Individual defined above.
-	</p></li>
-	<li><p>
+    </p></li>
+    <li><p>
     ``You'' (or ``Your'') means a Private Individual or Organisation
      exercising rights under, and complying with all of the terms of,
      this License or a future version of this License issued under
@@ -254,18 +275,18 @@ AGREEMENT.
      of such entity, whether by contract or otherwise, or (b)
      ownership of more than fifty percent (50%) of the outstanding
      shares or beneficial ownership of such entity.
-	</p></li>
-	<li><p>
-	The Package is an original work written by Anthony C. Howe,
-	hereto referred to as the ``Author''.
-	</p></li>
-	</ol>
+    </p></li>
+    <li><p>
+    The Package is an original work written by Anthony C. Howe,
+    hereto referred to as the ``Author''.
+    </p></li>
+    </ol>
 </li>
- 
+
 <li><h4>License To Use</h4>
-	<ol>
-	<li><p>
-	If You are a Private Individual and so
+    <ol>
+    <li><p>
+    If You are a Private Individual and so
      benefited from a reduced purchase price, then You may only
      compile, install, and use this Package, with or without private
      modifications, exclusively on a single machine You legally own or
@@ -273,8 +294,8 @@ AGREEMENT.
      notice, any and all license control methods (<a href="#License_Control">see below</a>), and any
      links within the Package back to the most current online versions
      of this License and Disclaimer.
-	</p></li>
-	<li><p>
+    </p></li>
+    <li><p>
     Otherwise if You have paid the full purchase price, then You may
      compile, install, and use this Package, with or without private
      modifications, exclusively on machines You legally own or rent from a third party,
@@ -282,20 +303,20 @@ AGREEMENT.
      any and all license control methods (<a href="#License_Control">see below</a>), and any links
      within the Package back to the most current online versions of
      this License and Disclaimer.
-	</p></li>
-	<li><p>
+    </p></li>
+    <li><p>
 You may copy, share, distribute, modify, and create derivative
 works from the user manuals and any related documentation
 solely for Your internal business purposes, such as in-house
 documentation, training manuals, or reference material.
-	</p></li>
-	</ol>
+    </p></li>
+    </ol>
 </li>
 
 
 <li><h4>Restrictions</h4>
-	<ol>
-	<li><p>
+    <ol>
+    <li><p>
 Redistribution, including but not limited to books, CDROMS,
 download mirrors, floppy diskettes, hard disks, hardcopy print
 outs, online archives, solid state disks, streaming tapes, or
@@ -305,14 +326,14 @@ and all derivative works such as source patches, binaries,
 binary patches, or similar is expressly forbidden without prior
 written permission in hardcopy (letter or fax) signed and dated
 by the Author.
-	</p></li>
-	<li><p>
+    </p></li>
+    <li><p>
 
 It is expressly forbidden for You to use the Package, in whole
 or in part, in any other software, except those designated by
 the Author.
-	</p></li>
-	<li><p>
+    </p></li>
+    <li><p>
 
 It is expressly forbidden for You to use the Package to develop
 any software or other technology having the same primary
@@ -321,20 +342,20 @@ Package in any development or test procedure that seeks to
 develop like software or other technology, or determine if such
 software or other technology performs in a similar manner as
 the Package.
-	</p></li>
-	<li><p>
+    </p></li>
+    <li><p>
 
-You may not sell, rent, lease, or transfer the Package to third 
+You may not sell, rent, lease, or transfer the Package to third
 parties without prior written permission in hardcopy (letter or fax)
 signed and dated by the Author.
-	</p></li>
-	</ol>
+    </p></li>
+    </ol>
 </li>
 
 
 <li><h4>Termination</h4>
-	<ol>
-	<li><p>
+    <ol>
+    <li><p>
 This Agreement is effective until terminated. You may
 terminate this Agreement at any time by destroying all copies
 of the Package. This Agreement will terminate immediately without
@@ -344,19 +365,19 @@ immediately should any portion of the Package become, or in
 either party's opinion be likely to become, the subject of a
 claim of infringement of any intellectual property right. Upon
 Termination, You must destroy all copies of the Package.
-	</p></li>
-	</ol>
+    </p></li>
+    </ol>
 </li>
 
 
 <li><h4>Versions Of The License</h4>
-	<ol>
-	<li><p>
+    <ol>
+    <li><p>
 New Versions. The Author may publish revised and/or new
 versions of the License from time to time. Each version will
 be given a distinguishing version number.
-	</p></li>
-	<li><p>
+    </p></li>
+    <li><p>
 
 Effect of New Versions. Once a version of the Package has been
 published under a particular version of the License, You may
@@ -365,8 +386,8 @@ version. You may also choose to use such Package under the
 terms of any subsequent version of the License published by the
 Author. No one other than the Author has the right to modify
 the terms applicable to the Package created under this License.
-	</p></li>
-	</ol>
+    </p></li>
+    </ol>
 </li>
 </ol>
 
@@ -404,10 +425,10 @@ parties, unless demanded by court order.
 <h3>Support</h3>
 
 <p>
-Support is only provided for the Author's original Package. Priority 
+Support is only provided for the Author's original Package. Priority
 support can be purchased. Free support is limited, based on the Author's
-availability, though enhancements requests and problem reports are welcome. 
-A community mailing list is available; please refer to 
+availability, though enhancements requests and problem reports are welcome.
+A community mailing list is available; please refer to
 <a href="http://www.snertsoft.com/">SnertSoft</a> web site Support area for details.
 </p>
 
