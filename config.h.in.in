@@ -47,7 +47,11 @@ extern "C" {
 #endif
 
 #if !defined(CF_FILE)
-# define CF_FILE			CF_DIR "/" _NAME ".cf"
+# if defined(__WIN32__)
+#  define CF_FILE			CF_DIR "/" _NAME ".cf"
+# else
+#  define CF_FILE			"/etc/" _NAME ".cf"
+# endif
 #endif
 
 #ifndef SAFE_PATH
