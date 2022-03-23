@@ -146,7 +146,8 @@ typedef struct {
 	long inputLength;
 	char input[SMTP_TEXT_LINE_LENGTH+1];
 	char reply[SMTP_REPLY_LINE_LENGTH+1];
-	char client_addr[IPV6_STRING_LENGTH];
+	char client_addr[IPV6_STRING_SIZE];
+	char client_name[DOMAIN_SIZE];
 } Connection;
 
 typedef struct {
@@ -588,6 +589,8 @@ roundhouse(ServerSession *session)
 	session->data = conn;
 	conn->id = session->id_log;
 	conn->client = session->client;
+	(void) socketAddressGetName(&conn->client->address, conn->client_name, sizeof (conn->client_name));
+	(void) socketAddressGetString(&conn->client->address, 0, conn->client_addr, sizeof (conn->client_addr));
 
 	(void) socketSetNagle(conn->client, 0);
 	(void) socketSetLinger(conn->client, 0);
@@ -629,6 +632,18 @@ roundhouse(ServerSession *session)
 	}
 
 	smtpConnPrint(conn, -1, "220 Welcome to " _DISPLAY "/" _VERSION "\r\n");
+
+	/* Send XCLIENT ADDR= NAME=, ignore response since its a Postfix thing. */
+	int is_ipv4 = conn->client->address.sa.sa_family == AF_INET;
+	(void) snprintf(
+		conn->input, sizeof (conn->input), "XCLIENT ADDR=%s%s NAME=%s\r\n",
+		is_ipv4 ? "" : IPV6_TAG, conn->client_addr, conn->client_name
+	);
+	syslog(LOG_DEBUG, LOG_FMT "> %s", LOG_ARG, conn->input);
+	for (i = 0; i < nservers; i++) {
+		(void) smtpConnPrint(conn, i, conn->input);
+		(void) smtpConnGetResponse(conn, i, conn->reply, sizeof (conn->reply), &code);
+	}
 
 	/* Relay client SMTP commands to each SMTP server in turn. */
 	while (socketHasInput(conn->client, socket_timeout)) {
