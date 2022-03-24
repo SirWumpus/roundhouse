@@ -272,11 +272,19 @@ savePid(char *file)
 static long
 smtpConnPrint(Connection *conn, int index, char *line)
 {
+	Socket2 *s;
+
 	if (index < 0)
 		/* Sending to the client. */
 		syslog(LOG_DEBUG, LOG_FMT "< %s", LOG_ARG, line);
 
-	return socketWrite(index < 0 ? conn->client : conn->servers[index], (unsigned char *) line, strlen(line));
+	s = index < 0 ? conn->client : conn->servers[index];
+	if (s == NULL) {
+		/* Server in this slot has been disconnected. */
+		return 0;
+	}
+
+	return socketWrite(s, (unsigned char *) line, strlen(line));
 }
 
 static int
