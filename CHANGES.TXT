@@ -11,6 +11,13 @@ is no set schedule for releases.
    +	Consider adding SASL and man-in-middle support for AUTH
 	DIGEST-MD5 and possibly other mechanisms.
 
+--0.8.0--
+
+   !	Fix memory allocation error.
+
+   !	Do not disconnect down stream servers on negative replies.
+
+
 --0.7.0--
 
    +	Add client side XCLIENT support that forwards the client's address
