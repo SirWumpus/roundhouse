@@ -11,8 +11,15 @@ is no set schedule for releases.
    +	Consider adding SASL and man-in-middle support for AUTH
 	DIGEST-MD5 and possibly other mechanisms.
 
-   +	Consider adding man-in-middle support for STARTTLS.
+--0.7.0--
 
+   +	Add client side XCLIENT support that forwards the client's address
+   	and host name to the down stream servers.  This only has meaning to
+   	Postfix, BarricadeMX, and any servers that support it, which is
+   	Sendmail is not one as I recall.
+
+   !	Re-implement STARTTLS support so that Rounhouse is the TLS end
+	point and forwards in the clear to the down stream servers.
 
 --0.6.1--
 
