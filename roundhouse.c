@@ -531,8 +531,8 @@ roundhouse(ServerSession *session)
 	(void) socketSetLinger(conn->client, 0);
 	(void) socketSetNonBlocking(conn->client, 1);
 
-	if ((conn->servers = calloc(nservers, sizeof (SOCKET))) == NULL) {
-		syslog(LOG_ERR, LOG_FMT "out of memory", LOG_ARG);
+	if ((conn->servers = calloc(nservers, sizeof (*conn->servers))) == NULL) {
+		syslog(LOG_ERR, LOG_FMT "%s (%d)", LOG_ARG, strerror(errno), errno);
 		goto error0;
 	}
 
