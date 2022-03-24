@@ -498,22 +498,12 @@ smtpConnData(Connection *conn)
 			}
 
 			if (isDot) {
-				if (smtpConnGetResponse(conn, i, conn->reply, sizeof (conn->reply), &code) != 0) {
-					smtpConnDisconnect(conn, i);
-					continue;
-				}
-
-				/* When a SMTP server rejects the client's
-				 * most recent command, then close the
-				 * session with that server, since we can't
-				 * report N differnet SMTP replies to the
-				 * client.
+				/* Get and ignore the response leaving the
+				 * connection open for further MAIL.  Tell
+				 * the client success, since we can't report
+				 * N differnet SMTP replies to the client.
 				 */
-				if (1 < serversRemaining && 400 <= code) {
-					smtpConnPrint(conn, i, "QUIT\r\n");
-					smtpConnDisconnect(conn, i);
-					continue;
-				}
+				(void) smtpConnGetResponse(conn, i, conn->reply, sizeof (conn->reply), &code);
 			}
 		}
 	}
@@ -659,21 +649,9 @@ roundhouse(ServerSession *session)
 
 			if (smtpConnGetResponse(conn, i, conn->reply, sizeof (conn->reply), &code) != 0) {
 				smtpConnDisconnect(conn, i);
-			}
-#ifdef OFF
-			/* When a SMTP server rejects the client's
-			 * most recent command, then close the
-			 * session with that server, since we can't
-			 * report N differnet SMTP replies to the
-			 * client.
-			 */
-			else if (1 < serversRemaining && 400 <= code) {
-				smtpConnPrint(conn, i, "QUIT\r\n");
-				smtpConnDisconnect(conn, i);
-			}
-#endif
-			else if (code == 354)
+			} else if (code == 354) {
 				isData++;
+			}
 		}
 
 		if (isQuit) {
