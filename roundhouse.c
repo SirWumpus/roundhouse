@@ -193,7 +193,7 @@ static char *usage_message =
 "\n"
 #ifdef HAVE_OPENSSL_SSL_H
 "-c ca_pem\tCertificate Authority root certificate chain file\n"
-"-C dir\t\tCertificate Authority root certificate directory\n"
+"-C ca_dir\tCertificate Authority root certificate directory\n"
 #endif
 "-d\t\tdisable daemon mode and run as a foreground application\n"
 "-g name\t\trun as this group\n"
@@ -210,7 +210,7 @@ static char *usage_message =
 "-v\t\tverbose maillog output\n"
 "-w add|remove\tadd or remove Windows service; ignored on unix\n"
 "\n"
-"server\t\thost[:port] specifier.\n"
+"server\t\thost[:port] specifier; default port " QUOTE(SMTP_PORT) ".\n"
 "\n"
 _NAME " " _VERSION " " _COPYRIGHT "\n"
 ;

@@ -3,7 +3,7 @@
 <html>
 <head>
 <title>
-SnertSoft - @PACKAGE_NAME@/@PACKAGE_VERSION@ (beta) for Sendmail
+SnertSoft - @PACKAGE_NAME@/@PACKAGE_VERSION@
 </title>
 <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1" />
 <meta name="keywords" content="SMTP session multiplexer multiplexor data stream splitter roundhouse" />
@@ -42,11 +42,6 @@ SnertSoft - @PACKAGE_NAME@/@PACKAGE_VERSION@ (beta) for Sendmail
         surrounding or adjacent to turntables. The roundhouse in a railroad
         yard is typically where steam locomotives were stored when they
         weren't in use.
-
-        <p class="small">-
-        <a href="http://www.answers.com/roundhouse&r=67">
-        answers.com</a>
-        </p>
     </td>
     <td>&nbsp;&nbsp;&nbsp;</td>
     <td><img src="Img/Locomotives-Roundhouse-265x204.png" width="265" height="204" border="1"></td>
@@ -152,7 +147,7 @@ servers specified.
 
 <dt><span class="syntax">server ...</span></dt>
 <dd>
-One or more SMTP servers specified as a unix domain socket path or as a host[,port] specifier.
+One or more SMTP servers specified as <span class="param">host[:port]</span> specifier.
 </dd>
 
 </dl>
