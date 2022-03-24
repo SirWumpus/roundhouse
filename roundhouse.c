@@ -142,7 +142,7 @@ static const char log_init[] = "init error %s(%d): %s (%d)";
 
 typedef struct {
 	char *id;
-	int nservers;
+	int connected;
 	Socket2 *client;
 	Socket2 **servers;
 	long inputLength;
@@ -343,7 +343,7 @@ smtpConnDisconnect(Connection *conn, int index)
 		syslog(LOG_DEBUG, LOG_FMT "#%d disconnecting from %s", LOG_ARG, index, smtp_host[index]);
 		socketClose(conn->servers[index]);
 		conn->servers[index] = NULL;
-		conn->nservers--;
+		conn->connected--;
 	}
 }
 
@@ -472,7 +472,7 @@ static int
 smtpConnData(Connection *conn)
 {
 	long length;
-	int i, code, isDot, serversRemaining;
+	int i, code, isDot;
 
 	smtpConnPrint(conn, -1, "354 enter mail, end with \".\" on a line by itself\r\n");
 
@@ -492,7 +492,6 @@ smtpConnData(Connection *conn)
 		conn->input[length++] = '\n';
 		conn->input[length] = '\0';
 
-		serversRemaining = conn->nservers;
 		for (i = 0; i < nservers; i++) {
 			if (conn->servers[i] == NULL)
 				continue;
@@ -521,7 +520,7 @@ roundhouse(ServerSession *session)
 {
 	long length;
 	Connection *conn;
-	int i, code, isQuit, isData, isEhlo, serversRemaining;
+	int i, code, isQuit, isData, isEhlo;
 
 	if ((conn = calloc(1, sizeof (*conn))) == NULL)
 		return -1;
@@ -542,12 +541,12 @@ roundhouse(ServerSession *session)
 	}
 
 	/* Connect to all the SMTP servers. */
-	conn->nservers = 0;
+	conn->connected = 0;
 	for (i = 0; i < nservers; i++) {
 		if ((conn->servers[i] = socketOpen(servers[i], 1)) == NULL)
 			continue;
 
-		conn->nservers++;
+		conn->connected++;
 		syslog(LOG_DEBUG, LOG_FMT "#%d connecting to %s", LOG_ARG, i, smtp_host[i]);
 
 		if (socketClient(conn->servers[i], 0)) {
@@ -565,7 +564,7 @@ roundhouse(ServerSession *session)
 		}
 	}
 
-	if (conn->nservers <= 0) {
+	if (conn->connected <= 0) {
 		smtpConnPrint(conn, -1, "421 service temporarily unavailable\r\n");
 		syslog(LOG_ERR, LOG_FMT "no answer from any SMTP server", LOG_ARG);
 		goto error0;
@@ -635,7 +634,6 @@ roundhouse(ServerSession *session)
 		conn->input[conn->inputLength++] = '\n';
 		conn->input[conn->inputLength] = '\0';
 
-		serversRemaining = conn->nservers;
 		for (i = 0; i < nservers; i++) {
 			if (conn->servers[i] == NULL)
 				continue;
@@ -667,7 +665,7 @@ roundhouse(ServerSession *session)
 		if (isData && smtpConnData(conn))
 			goto error1;
 
-		if (conn->nservers <= 0)
+		if (conn->connected <= 0)
 			goto error1;
 
 		/* When there is more than one SMTP server, we want to
@@ -677,7 +675,7 @@ roundhouse(ServerSession *session)
 		 * When there is only one SMTP server remaining, then we
 		 * can forward the server's response to the client.
 		 */
-		if (serversRemaining == 1) {
+		if (conn->connected == 1) {
 			length = strlen(conn->reply);
 			if (sizeof (conn->reply) <= length+3)
 				length = sizeof (conn->reply)-3;
