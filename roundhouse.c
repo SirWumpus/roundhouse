@@ -289,6 +289,12 @@ smtpConnGetResponse(Connection *conn, int index, char *line, long size, int *cod
 	if (conn == NULL || line == NULL)
 		return EFAULT;
 
+	s = conn->servers[index];
+	if (s == NULL) {
+		/* Server in this slot has been disconnected. */
+		return EFAULT;
+	}
+
 	/* Ideally we should collect _all_ the response lines into a variable
 	 * length buffer (see com/snert/lib/util/Buf.h), but I don't see any
 	 * real need for it just yet.
@@ -296,7 +302,6 @@ smtpConnGetResponse(Connection *conn, int index, char *line, long size, int *cod
 
 	value = 450;
 
-	s = conn->servers[index];
 	socketSetTimeout(s, socket_timeout / nservers);
 
 	do {
