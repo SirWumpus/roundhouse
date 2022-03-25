@@ -11,6 +11,11 @@ is no set schedule for releases.
    +	Consider adding SASL and man-in-middle support for AUTH
 	DIGEST-MD5 and possibly other mechanisms.
 
+--0.8.1--
+
+   !	Disable STARTTLS if OpenSSL not enable or if -k is unset or -k ""
+   	is explicitly set.
+
 --0.8.0--
 
    !	Fix memory allocation error.
