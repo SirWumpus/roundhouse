@@ -129,10 +129,6 @@
 #define LOG_FMT		"%s "
 #define LOG_ARG		conn->id
 
-#ifndef KEY_CRT_PEM
-#define KEY_CRT_PEM	NULL
-#endif
-
 static const char log_io[] = "socket error %s(%d): %s (%d)";
 static const char log_init[] = "init error %s(%d): %s (%d)";
 
@@ -173,16 +169,20 @@ static SocketAddress *servers[MAX_ARGV_LENGTH];
 
 static ServerSignals signals;
 
-static char *ca_chain;
-static char *cert_dir;
-static char *key_crt_pem = KEY_CRT_PEM;
+static char *ca_chain = NULL;
+static char *cert_dir = NULL;
 static char *key_pass = NULL;
+static char *key_crt_pem = NULL;
 
 #ifdef HAVE_OPENSSL_SSL_H
+static const char ehlo_tls[] = "250-AUTH " AUTH_MECHANISMS "\r\n250-PIPELINING\r\n250 STARTTLS\r\n";
 # define GETOPT_TLS	"c:C:k:K:"
 #else
 # define GETOPT_TLS
 #endif
+
+static const char ehlo_basic[] = "250-AUTH " AUTH_MECHANISMS "\r\n250 PIPELINING\r\n";
+static const char *ehlo_reply = ehlo_basic;
 
 static char *usage_message =
 "usage: " _NAME " [-dqv][-i ip,...][-t timeout][-u name][-g name]\n"
@@ -201,7 +201,8 @@ static char *usage_message =
 "\t\toptional :port number to listen on for SMTP connections;\n"
 "\t\tdefault is \"[::0]:25,0.0.0.0:25\"\n"
 #ifdef HAVE_OPENSSL_SSL_H
-"-k key_crt_pem\tprivate key and certificate chain file\n"
+"-k key_crt_pem\tprivate key and certificate chain file.  When left unset\n"
+"\t\tor explicitly set to an empty string then disable STARTTLS.\n"
 "-K key_pass\tpassword for private key; default no password\n"
 #endif
 "-q\t\tx1 slow quit, x2 quit now, x3 restart, x4 restart-if\n"
@@ -270,7 +271,7 @@ savePid(char *file)
 }
 
 static long
-smtpConnPrint(Connection *conn, int index, char *line)
+smtpConnPrint(Connection *conn, int index, const char *line)
 {
 	Socket2 *s;
 
@@ -504,7 +505,7 @@ smtpConnData(Connection *conn)
 			if (conn->servers[i] == NULL)
 				continue;
 
-			if (smtpConnPrint(conn, i, conn->input) < 0) {
+			if (smtpConnPrint(conn, i, (const char *) conn->input) < 0) {
 				smtpConnDisconnect(conn, i);
 				continue;
 			}
@@ -588,7 +589,7 @@ roundhouse(ServerSession *session)
 	);
 	syslog(LOG_DEBUG, LOG_FMT "> %s", LOG_ARG, conn->input);
 	for (i = 0; i < nservers; i++) {
-		(void) smtpConnPrint(conn, i, conn->input);
+		(void) smtpConnPrint(conn, i, (const char *) conn->input);
 		(void) smtpConnGetResponse(conn, i, conn->reply, sizeof (conn->reply), &code);
 	}
 
@@ -607,6 +608,11 @@ roundhouse(ServerSession *session)
 		}
 
 		if (0 < TextInsensitiveStartsWith(conn->input, "STARTTLS")) {
+			if (key_crt_pem == NULL) {
+				(void) smtpConnPrint(conn, -1, "502 command not recognised\r\n");
+				continue;
+			}
+
 			if (socket3_is_tls(conn->client->fd)) {
 				(void) smtpConnPrint(conn, -1, "503 TLS already started\r\n");
 				continue;
@@ -646,7 +652,7 @@ roundhouse(ServerSession *session)
 			if (conn->servers[i] == NULL)
 				continue;
 
-			if (smtpConnPrint(conn, i, conn->input) < 0) {
+			if (smtpConnPrint(conn, i, (const char *) conn->input) < 0) {
 				smtpConnDisconnect(conn, i);
 				continue;
 			}
@@ -691,7 +697,7 @@ roundhouse(ServerSession *session)
 			conn->reply[length++] = '\n';
 			conn->reply[length] = '\0';
 
-			smtpConnPrint(conn, -1, conn->reply);
+			smtpConnPrint(conn, -1, (const char *) conn->reply);
 		}
 
 		else if (isEhlo) {
@@ -699,7 +705,7 @@ roundhouse(ServerSession *session)
 			 * because some mail clients will abort if
 			 * STARTTLS and AUTH are not supported.
 			 */
-			smtpConnPrint(conn, -1, "250-AUTH " AUTH_MECHANISMS "\r\n250-PIPELINING\r\n250 STARTTLS\r\n");
+			smtpConnPrint(conn, -1, ehlo_reply);
 		}
 
 		else {
@@ -800,7 +806,13 @@ serverOptions(int argc, char **argv)
 			cert_dir = optarg;
 			break;
 		case 'k':
-			key_crt_pem = optarg;
+			if (optarg == NULL || *optarg == '\0') {
+				ehlo_reply = ehlo_basic;
+				key_crt_pem = NULL;
+			} else {
+				ehlo_reply = ehlo_tls;
+				key_crt_pem = optarg;
+			}
 			break;
 		case 'K':
 			key_pass = optarg;

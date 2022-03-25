@@ -90,6 +90,7 @@ if test -f '../lib/version.sh' ; then
 	AC_SUBST(CFLAGS_SSL)
 	AC_SUBST(LDFLAGS_SSL)
 	AC_SUBST(LIBS_SSL)
+	AC_SUBST(ETC_SSL)
 
 	expr "${CFLAGS}" : '.*-pthread' >/dev/null ;
 	has_freebsd_pthread=$?

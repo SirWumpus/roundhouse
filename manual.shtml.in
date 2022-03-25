@@ -109,7 +109,8 @@ default is <span class="param">[::0]:25,0.0.0.0:25</span>.
 
 <a name="KeyCrtPem"></a>
 <dt><span class="syntax">-k</span> <span class="param">key_crt_pem</span></dt>
-<dd>Private key and certificate chain file.
+<dd>Private key and certificate chain file.  When left unset
+or explicitly set to an empty string then disable STARTTLS.
 </dd>
 
 <a name="KeyPass"></a>
