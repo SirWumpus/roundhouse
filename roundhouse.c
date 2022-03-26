@@ -208,7 +208,7 @@ static char *usage_message =
 "-q\t\tx1 slow quit, x2 quit now, x3 restart, x4 restart-if\n"
 "-t timeout\tclient socket timeout in seconds, default 300\n"
 "-u name\t\trun as this user\n"
-"-v\t\tverbose maillog output\n"
+"-v\t\t-v log SMTP; -vv SMTP and message headers; -vvv everything\n"
 "-w add|remove\tadd or remove Windows service; ignored on unix\n"
 "\n"
 "server\t\thost[:port] specifier; default port " QUOTE(SMTP_PORT) ".\n"
@@ -233,20 +233,6 @@ syslog(int level, const char *fmt, ...)
 	else
 		LogV(level, fmt, args);
 	va_end(args);
-}
-
-int
-reportAccept(ServerSession *session)
-{
-	syslog(LOG_INFO, "%s start interface=[%s] client=[%s]", session->id_log, session->if_addr, session->address);
-	return 0;
-}
-
-int
-reportFinish(ServerSession *session)
-{
-	syslog(LOG_INFO, "%s end interface=[%s] client=[%s]", session->id_log, session->if_addr, session->address);
-	return 0;
 }
 
 int
@@ -481,7 +467,7 @@ static int
 smtpConnData(Connection *conn)
 {
 	long length;
-	int i, code, isDot;
+	int i, code, isDot, isEOH = 0;
 
 	smtpConnPrint(conn, -1, "354 enter mail, end with \".\" on a line by itself\r\n");
 
@@ -492,9 +478,19 @@ smtpConnData(Connection *conn)
 			return -1;
 		}
 
-		syslog(LOG_DEBUG, LOG_FMT "> %s", LOG_ARG, conn->input);
-
 		isDot = conn->input[0] == '.' && conn->input[1] == '\0';
+		if (!isEOH && length == 0) {
+			/* First blank line is EOH. */
+			isEOH = 1;
+			if (0 < debug && debug < 3) {
+				syslog(LOG_DEBUG, LOG_FMT "message content not logged", LOG_ARG);
+			}
+		}
+
+		/* -v log dot, -vv log only headers, -vvv log everything. */
+		if (2 < debug || (1 < debug && !isEOH) || (0 < debug && isDot)) {
+			syslog(LOG_DEBUG, LOG_FMT "> %s", LOG_ARG, conn->input);
+		}
 
 		/* Add back the CRLF removed by socketReadLine(). */
 		conn->input[length++] = '\r';
@@ -530,6 +526,8 @@ roundhouse(ServerSession *session)
 	long length;
 	Connection *conn;
 	int i, code, isQuit, isData, isEhlo;
+
+	syslog(LOG_INFO, "%s start interface=[%s] client=[%s]", session->id_log, session->if_addr, session->address);
 
 	if ((conn = calloc(1, sizeof (*conn))) == NULL)
 		return -1;
@@ -692,6 +690,8 @@ roundhouse(ServerSession *session)
 		if (conn->connected <= 0)
 			goto error1;
 
+#ifdef HMMM
+/* Does not handle multiline replies, in particular EHLO. */
 		/* When there is more than one SMTP server, we want to
 		 * forward as much the of the client's connection to all
 		 * the servers, so we keep telling the client 250.
@@ -710,7 +710,9 @@ roundhouse(ServerSession *session)
 			smtpConnPrint(conn, -1, (const char *) conn->reply);
 		}
 
-		else if (isEhlo) {
+		else
+#endif
+		if (isEhlo) {
 			/* We have to feed a reasonable EHLO response,
 			 * because some mail clients will abort if
 			 * STARTTLS and AUTH are not supported.
@@ -729,7 +731,9 @@ error0:
 	free(conn->servers);
 	free(conn);
 
-	return reportFinish(session);
+	syslog(LOG_INFO, "%s end interface=[%s] client=[%s]", session->id_log, session->if_addr, session->address);
+
+	return 0;
 }
 
 int
@@ -764,7 +768,6 @@ serverMain(void)
 		goto error1;
 
 	smtp->debug.level = debug;
-	smtp->hook.session_accept = reportAccept;
 	smtp->hook.session_process = roundhouse;
 	serverSetStackSize(smtp, SERVER_STACK_SIZE);
 
