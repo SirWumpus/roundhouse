@@ -577,7 +577,9 @@ roundhouse(ServerSession *session)
 		goto error0;
 	}
 
-	smtpConnPrint(conn, -1, "220 Welcome to " _DISPLAY "/" _VERSION "\r\n");
+	/* Multiline welcome message can throw off some spam engines. */
+	(void) snprintf(conn->input, sizeof (conn->input), "220-" _DISPLAY " switch yard for mail.\r\n220 Session ID %s.\r\n", conn->id);
+	smtpConnPrint(conn, -1, conn->input);
 
 	/* Send XCLIENT ADDR= NAME=, ignore response since its a Postfix thing. */
 	int is_ipv4 = conn->client->address.sa.sa_family == AF_INET;
