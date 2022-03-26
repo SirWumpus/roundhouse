@@ -960,7 +960,7 @@ main(int argc, char **argv)
 		pid_t ppid;
 		int pid_fd;
 
-		openlog(_NAME, LOG_PID|LOG_NDELAY, LOG_USER);
+		openlog(_NAME, LOG_PID|LOG_NDELAY, LOG_MAIL);
 		setlogmask(LOG_UPTO(LOG_DEBUG));
 
 		if ((ppid = fork()) < 0) {
