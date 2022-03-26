@@ -591,6 +591,16 @@ roundhouse(ServerSession *session)
 	for (i = 0; i < nservers; i++) {
 		(void) smtpConnPrint(conn, i, (const char *) conn->input);
 		(void) smtpConnGetResponse(conn, i, conn->reply, sizeof (conn->reply), &code);
+
+		/* See reply codes http://www.postfix.org/XCLIENT_README.html */
+		if (code == 421) {
+			/* Unable to proceed, disconnecting.  Assume "we don't like them."
+			 * A server's ACL could opt to disconnect immediately rather than
+			 * return a negative code and wait for QUIT.  Postfix is a little
+			 * vague.
+			 */
+			goto error1;
+		}
 	}
 
 	/* Relay client SMTP commands to each SMTP server in turn. */
