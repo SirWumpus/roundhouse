@@ -597,6 +597,7 @@ roundhouse(ServerSession *session)
 			 * return a negative code and wait for QUIT.  Postfix is a little
 			 * vague.
 			 */
+			smtpConnPrint(conn, -1, "421 service unavailable\r\n");
 			goto error1;
 		}
 	}
