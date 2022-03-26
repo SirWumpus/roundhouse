@@ -11,6 +11,16 @@ is no set schedule for releases.
    +	Consider adding SASL and man-in-middle support for AUTH
 	DIGEST-MD5 and possibly other mechanisms.
 
+
+--0.8.2--
+
+   !	Drop connection if XCLIENT replies 421 from any server.
+
+   !	Send logging to LOG_MAIL instead of LOG_USER.
+
+   !	Avoid logging message DATA unless requested; -v log SMTP; -vv
+	SMTP and message headers; -vvv everything.
+
 --0.8.1--
 
    !	Disable STARTTLS if OpenSSL not enable or if -k is unset or -k ""
