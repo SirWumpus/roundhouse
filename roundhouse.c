@@ -155,6 +155,7 @@ typedef struct {
 } Stream;
 
 static int debug;
+static int connect_all;
 static int server_quit;
 static int daemon_mode = 1;
 static char *user_id = NULL;
@@ -181,16 +182,18 @@ static const char ehlo_tls[] = "250-AUTH " AUTH_MECHANISMS "\r\n250-PIPELINING\r
 # define GETOPT_TLS
 #endif
 
+static const char reply_421[] = "421 service temporarily unavailable\r\n";
 static const char ehlo_basic[] = "250-AUTH " AUTH_MECHANISMS "\r\n250 PIPELINING\r\n";
 static const char *ehlo_reply = ehlo_basic;
 
 static char *usage_message =
-"usage: " _NAME " [-dqv][-i ip,...][-t timeout][-u name][-g name]\n"
+"usage: " _NAME " [-Adqv][-i ip,...][-t timeout][-u name][-g name]\n"
 #ifdef HAVE_OPENSSL_SSL_H
 "       [-c ca_pem][-C ca_dir][-k key_crt_pem][-K key_pass]\n"
 #endif
 "       [-w add|remove] server ...\n"
 "\n"
+"-A\t\tall down stream servers must connect, else 421 the client.\n"
 #ifdef HAVE_OPENSSL_SSL_H
 "-c ca_pem\tCertificate Authority root certificate chain file\n"
 "-C ca_dir\tCertificate Authority root certificate directory\n"
@@ -206,12 +209,13 @@ static char *usage_message =
 "-K key_pass\tpassword for private key; default no password\n"
 #endif
 "-q\t\tx1 slow quit, x2 quit now, x3 restart, x4 restart-if\n"
-"-t timeout\tclient socket timeout in seconds, default 300\n"
+"-t timeout\tclient socket timeout in seconds; default 300\n"
 "-u name\t\trun as this user\n"
-"-v\t\t-v log SMTP; -vv SMTP and message headers; -vvv everything\n"
+"-v\t\tx1 log SMTP; x2 SMTP and message headers; x3 everything\n"
 "-w add|remove\tadd or remove Windows service; ignored on unix\n"
 "\n"
-"server\t\thost[:port] specifier; default port " QUOTE(SMTP_PORT) ".\n"
+"server\t\thost[:port] of down stream mail server to forward mail to;\n"
+"\t\tdefault port " QUOTE(SMTP_PORT) "\n"
 "\n"
 _NAME " " _VERSION " " _COPYRIGHT "\n"
 ;
@@ -544,6 +548,7 @@ roundhouse(ServerSession *session)
 
 	if ((conn->servers = calloc(nservers, sizeof (*conn->servers))) == NULL) {
 		syslog(LOG_ERR, LOG_FMT "%s (%d)", LOG_ARG, strerror(errno), errno);
+		smtpConnPrint(conn, -1, reply_421);
 		goto error0;
 	}
 
@@ -559,6 +564,10 @@ roundhouse(ServerSession *session)
 		if (socketClient(conn->servers[i], 0)) {
 			syslog(LOG_ERR, LOG_FMT "#%d connection to %s failed", LOG_ARG, i, smtp_host[i]);
 			smtpConnDisconnect(conn, i);
+			if (connect_all) {
+				smtpConnPrint(conn, -1, reply_421);
+				goto error1;
+			}
 			continue;
 		}
 
@@ -572,9 +581,9 @@ roundhouse(ServerSession *session)
 	}
 
 	if (conn->connected <= 0) {
-		smtpConnPrint(conn, -1, "421 service temporarily unavailable\r\n");
 		syslog(LOG_ERR, LOG_FMT "no answer from any SMTP server", LOG_ARG);
-		goto error0;
+		smtpConnPrint(conn, -1, reply_421);
+		goto error1;
 	}
 
 	/* Multiline welcome message can throw off some spam engines. */
@@ -599,7 +608,7 @@ roundhouse(ServerSession *session)
 			 * return a negative code and wait for QUIT.  Postfix is a little
 			 * vague.
 			 */
-			smtpConnPrint(conn, -1, "421 service unavailable\r\n");
+			smtpConnPrint(conn, -1, reply_421);
 			goto error1;
 		}
 	}
@@ -812,7 +821,7 @@ serverOptions(int argc, char **argv)
 	int ch, i;
 
 	optind = 1;
-	while ((ch = getopt(argc, argv, "dqvw:u:g:t:i:" GETOPT_TLS)) != -1) {
+	while ((ch = getopt(argc, argv, "Adqvw:u:g:t:i:" GETOPT_TLS)) != -1) {
 		switch (ch) {
 #ifdef HAVE_OPENSSL_SSL_H
 		case 'c':
@@ -834,6 +843,9 @@ serverOptions(int argc, char **argv)
 			key_pass = optarg;
 			break;
 #endif
+		case 'A':
+			connect_all = 1;
+			break;
 		case 'u':
 			/* Unix only. */
 			user_id = optarg;

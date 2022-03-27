@@ -63,7 +63,7 @@ using a production mail server's live data stream.
 
 <blockquote style="text-align: left;">
 <code>@PACKAGE_NAME@</code>
-<nobr>[<span class="syntax">-dqv</span>]</nobr>
+<nobr>[<span class="syntax">-Adqv</span>]</nobr>
 <nobr>[<span class="syntax">-c</span> <span class="param">ca_pem</span>]</nobr>
 <nobr>[<span class="syntax">-C</span> <span class="param">ca_dir</span>]</nobr>
 <nobr>[<span class="syntax">-g</span> <span class="param">group</span>]</nobr>
@@ -78,6 +78,11 @@ using a production mail server's live data stream.
 </blockquote>
 
 <dl>
+<a name="ConnectAll"></a>
+<dt><span class="syntax">-A</span></dt>
+<dd>All down stream servers must connect, else 421 the client.
+</dd>
+
 <a name="CaFile"></a>
 <dt><span class="syntax">-c</span> <span class="param">ca_pem</span></dt>
 <dd>Certificate Authority root certificate chain file.
