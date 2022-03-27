@@ -74,6 +74,10 @@ extern "C" {
 #define SOCKET_TIMEOUT			300000
 #endif
 
+#ifndef CONNECT_TIMEOUT
+#define CONNECT_TIMEOUT			15000
+#endif
+
 #ifndef MAX_ARGV_LENGTH
 #define MAX_ARGV_LENGTH			30
 #endif

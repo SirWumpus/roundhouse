@@ -163,6 +163,7 @@ static char *group_id = NULL;
 static char *windows_service;
 static char *interfaces = "[::0]:" QUOTE(SMTP_PORT) ",0.0.0.0:" QUOTE(SMTP_PORT);
 static long socket_timeout = SOCKET_TIMEOUT;
+static long connect_timeout = CONNECT_TIMEOUT;
 
 static int nservers;
 static char *smtp_host[MAX_ARGV_LENGTH];
@@ -561,7 +562,7 @@ roundhouse(ServerSession *session)
 		conn->connected++;
 		syslog(LOG_DEBUG, LOG_FMT "#%d connecting to %s", LOG_ARG, i, smtp_host[i]);
 
-		if (socketClient(conn->servers[i], 0)) {
+		if (socketClient(conn->servers[i], CONNECT_TIMEOUT)) {
 			syslog(LOG_ERR, LOG_FMT "#%d connection to %s failed", LOG_ARG, i, smtp_host[i]);
 			smtpConnDisconnect(conn, i);
 			if (connect_all) {
