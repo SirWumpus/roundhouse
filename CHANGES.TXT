@@ -12,6 +12,14 @@ is no set schedule for releases.
 	DIGEST-MD5 and possibly other mechanisms.
 
 
+--0.8.3--
+
+   !	Multiline welcome message.
+
+   !	Add -A option to require all down stream servers connect.
+
+   !	Shorter connect timeout.
+
 --0.8.2--
 
    !	Drop connection if XCLIENT replies 421 from any server.
