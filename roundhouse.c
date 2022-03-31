@@ -146,6 +146,7 @@ typedef struct {
 	char reply[SMTP_REPLY_LINE_LENGTH+1];
 	char client_addr[IPV6_STRING_SIZE];
 	char client_name[DOMAIN_SIZE];
+	char mail[SMTP_PATH_LENGTH+3];
 } Connection;
 
 typedef struct {
@@ -471,16 +472,48 @@ error0:
 static int
 smtpConnData(Connection *conn)
 {
+	time_t now;
 	long length;
+	struct tm local;
 	int i, code, isDot, isEOH = 0;
+	char stamp[40], line[SMTP_TEXT_LINE_LENGTH];
 
 	smtpConnPrint(conn, -1, "354 enter mail, end with \".\" on a line by itself\r\n");
+
+	/* Add our Return-Path and Received header. */
+	now = time(NULL);
+	(void) localtime_r(&now, &local);
+	(void) getRFC2821DateTime(&local, stamp, sizeof (stamp));
+	/* Note that conn->id is a session ID and does not
+	 * change (yet) with each MAIL transaction.
+	 */
+	(void) snprintf(
+		line, sizeof (line),
+		"Return-Path:%s\r\nReceived: from %s ([%s])\r\n\tid %s; %s\r\n",
+		conn->mail, conn->client_name, conn->client_addr, conn->id, stamp
+	);
+	if (1 < debug) {
+		syslog(LOG_DEBUG, LOG_FMT "> %s", LOG_ARG, line);
+	}
+	for (i = 0; i < nservers; i++) {
+		if (conn->servers[i] == NULL) {
+			continue;
+		}
+		if (smtpConnPrint(conn, i, (const char *) line) < 0) {
+			smtpConnDisconnect(conn, i);
+			continue;
+		}
+	}
 
 	/* Relay client's message to each SMTP server in turn. */
 	for (isDot = 0; !isDot && socketHasInput(conn->client, socket_timeout); ) {
 		if ((length = socketReadLine(conn->client, conn->input, sizeof (conn->input))) < 0) {
 			syslog(LOG_ERR, LOG_FMT "client read error during message: %s (%d)%c", LOG_ARG, strerror(errno), errno, length == SOCKET_EOF ? '!' : ' ');
 			return -1;
+		}
+		if (0 < TextInsensitiveStartsWith(conn->input, "Return-Path:")) {
+			/* We supply our Return-Path based on MAIL FROM: */
+			continue;
 		}
 
 		isDot = conn->input[0] == '.' && conn->input[1] == '\0';
@@ -657,6 +690,11 @@ roundhouse(ServerSession *session)
 
 		if (0 < TextInsensitiveStartsWith(conn->input, "AUTH LOGIN") && authLogin(conn))
 			break;
+
+		i = TextInsensitiveStartsWith(conn->input, "MAIL FROM:");
+		if (0 < i) {
+			(void) strncpy(conn->mail, conn->input+i, sizeof (conn->mail));
+		}
 
 		isEhlo = 0 < TextInsensitiveStartsWith(conn->input, "EHLO");
 		isQuit = 0 < TextInsensitiveStartsWith(conn->input, "QUIT");
