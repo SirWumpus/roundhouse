@@ -555,6 +555,7 @@ roundhouse(ServerSession *session)
 {
 	long length;
 	Connection *conn;
+	char xclient[SMTP_TEXT_LINE_LENGTH];
 	int i, code, isQuit, isData, isEhlo;
 
 	syslog(LOG_INFO, "%s start interface=[%s] client=[%s]", session->id_log, session->if_addr, session->address);
@@ -616,28 +617,12 @@ roundhouse(ServerSession *session)
 	(void) snprintf(conn->input, sizeof (conn->input), "220-" _DISPLAY " switch yard for mail.\r\n220 Session ID %s.\r\n", conn->id);
 	smtpConnPrint(conn, -1, conn->input);
 
-	/* Send XCLIENT ADDR= NAME=, ignore response since its a Postfix thing. */
+	/* Prepare XCLIENT just in case. */
 	int is_ipv4 = conn->client->address.sa.sa_family == AF_INET;
 	(void) snprintf(
-		conn->input, sizeof (conn->input), "XCLIENT ADDR=%s%s NAME=%s\r\n",
+		xclient, sizeof (xclient), "XCLIENT ADDR=%s%s NAME=%s\r\n",
 		is_ipv4 ? "" : IPV6_TAG, conn->client_addr, conn->client_name
 	);
-	syslog(LOG_DEBUG, LOG_FMT "> %s", LOG_ARG, conn->input);
-	for (i = 0; i < nservers; i++) {
-		(void) smtpConnPrint(conn, i, (const char *) conn->input);
-		(void) smtpConnGetResponse(conn, i, conn->reply, sizeof (conn->reply), &code);
-
-		/* See reply codes http://www.postfix.org/XCLIENT_README.html */
-		if (code == 421) {
-			/* Unable to proceed, disconnecting.  Assume "we don't like them."
-			 * A server's ACL could opt to disconnect immediately rather than
-			 * return a negative code and wait for QUIT.  Postfix is a little
-			 * vague.
-			 */
-			smtpConnPrint(conn, -1, reply_421);
-			goto error1;
-		}
-	}
 
 	/* Relay client SMTP commands to each SMTP server in turn. */
 	while (socketHasInput(conn->client, socket_timeout)) {
@@ -714,6 +699,23 @@ roundhouse(ServerSession *session)
 
 			if (smtpConnGetResponse(conn, i, conn->reply, sizeof (conn->reply), &code) != 0) {
 				smtpConnDisconnect(conn, i);
+			} else if (isEhlo && strcasestr(conn->reply, "XCLIENT") != NULL) {
+				/* Send XCLIENT ADDR= NAME=, ignore response since its a Postfix thing. */
+				syslog(LOG_DEBUG, LOG_FMT "> %s", LOG_ARG, xclient);
+				(void) smtpConnPrint(conn, i, (const char *) xclient);
+				(void) smtpConnGetResponse(conn, i, conn->reply, sizeof (conn->reply), &code);
+
+				/* See reply codes http://www.postfix.org/XCLIENT_README.html */
+				if (code == 421) {
+					/* Unable to proceed, disconnecting.  Assume "we don't like them."
+					 * A server's ACL could opt to disconnect immediately rather than
+					 * return a negative code and wait for QUIT.  Postfix is a little
+					 * vague.
+					 */
+					smtpConnPrint(conn, -1, reply_421);
+					goto error1;
+				}
+
 			} else if (code == 354) {
 				isData++;
 			}
