@@ -143,7 +143,7 @@ typedef struct {
 	Socket2 **servers;
 	long inputLength;
 	char input[SMTP_TEXT_LINE_LENGTH+1];
-	char reply[SMTP_REPLY_LINE_LENGTH+1];
+	char reply[SMTP_REPLY_LINE_LENGTH*5+1];
 	char client_addr[IPV6_STRING_SIZE];
 	char client_name[DOMAIN_SIZE];
 	char mail[SMTP_PATH_LENGTH+3];
@@ -284,7 +284,7 @@ static int
 smtpConnGetResponse(Connection *conn, int index, char *line, long size, int *code)
 {
 	Socket2 *s;
-	char *stop;
+	char *stop, *here;
 	long length, value;
 
 	if (conn == NULL || line == NULL)
@@ -305,15 +305,12 @@ smtpConnGetResponse(Connection *conn, int index, char *line, long size, int *cod
 
 	socketSetTimeout(s, socket_timeout / nservers);
 
+	length = 0;
+	here = line;
 	do {
-		/* Erase the first 4 bytes of the line buffer, which
-		 * corresponds with the 3 ASCII digit status code
-		 * followed by either a ASCII hyphen or space.
-		 */
-		line[0] = line[1] = line[2] = line[4] = '\0';
-
 		errno = 0;
-		switch (length = socketReadLine(s, line, size)) {
+		here += length;
+		switch (length = socketReadLine2(s, here, size - (here - line), 1)) {
 		case SOCKET_ERROR:
 			syslog(LOG_ERR, LOG_FMT "read error: %s (%d)", LOG_ARG, strerror(errno), errno);
 			return errno;
@@ -326,10 +323,10 @@ smtpConnGetResponse(Connection *conn, int index, char *line, long size, int *cod
 		if (length < 4)
 			return EIO;
 
-		syslog(LOG_DEBUG, LOG_FMT "#%d < %s", LOG_ARG, index, line);
+		syslog(LOG_DEBUG, LOG_FMT "#%d < %s", LOG_ARG, index, here);
 
-		value = strtol(line, &stop, 10);
-	} while (line + 3 == stop && line[3] == '-');
+		value = strtol(here, &stop, 10);
+	} while (here + 3 == stop && here[3] == '-');
 
 	if (code != NULL)
 		*code = value;
