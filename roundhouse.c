@@ -372,7 +372,7 @@ authLogin(Connection *conn)
 		if (!socketHasInput(conn->client, socket_timeout))
 			goto error0;
 
-		if ((userLen = socketReadLine(conn->client, userB64, sizeof (userB64))) < 0) {
+		if ((userLen = socketReadLine2(conn->client, userB64, sizeof (userB64), 0)) < 0) {
 			syslog(LOG_ERR, LOG_FMT "client read error: %s (%d)%c", LOG_ARG, strerror(errno), errno, userLen == SOCKET_EOF ? '!' : ' ');
 			goto error0;
 		}
@@ -387,7 +387,7 @@ authLogin(Connection *conn)
 	if (!socketHasInput(conn->client, socket_timeout))
 		goto error0;
 
-	if ((passLen = socketReadLine(conn->client, passB64, sizeof (passB64))) < 0) {
+	if ((passLen = socketReadLine2(conn->client, passB64, sizeof (passB64), 0)) < 0) {
 		syslog(LOG_ERR, LOG_FMT "client read error: %s (%d)%c", LOG_ARG, strerror(errno), errno, passLen == SOCKET_EOF ? '!' : ' ');
 		goto error0;
 	}
@@ -504,7 +504,7 @@ smtpConnData(Connection *conn)
 
 	/* Relay client's message to each SMTP server in turn. */
 	for (isDot = 0; !isDot && socketHasInput(conn->client, socket_timeout); ) {
-		if ((length = socketReadLine(conn->client, conn->input, sizeof (conn->input))) < 0) {
+		if ((length = socketReadLine2(conn->client, conn->input, sizeof (conn->input), 1)) < 0) {
 			syslog(LOG_ERR, LOG_FMT "client read error during message: %s (%d)%c", LOG_ARG, strerror(errno), errno, length == SOCKET_EOF ? '!' : ' ');
 			return -1;
 		}
@@ -526,11 +526,6 @@ smtpConnData(Connection *conn)
 		if (2 < debug || (1 < debug && !isEOH) || (0 < debug && isDot)) {
 			syslog(LOG_DEBUG, LOG_FMT "> %s", LOG_ARG, conn->input);
 		}
-
-		/* Add back the CRLF removed by socketReadLine(). */
-		conn->input[length++] = '\r';
-		conn->input[length++] = '\n';
-		conn->input[length] = '\0';
 
 		for (i = 0; i < nservers; i++) {
 			if (conn->servers[i] == NULL)
@@ -646,7 +641,7 @@ roundhouse(ServerSession *session)
 
 	/* Relay client SMTP commands to each SMTP server in turn. */
 	while (socketHasInput(conn->client, socket_timeout)) {
-		if ((conn->inputLength = socketReadLine(conn->client, conn->input, sizeof (conn->input))) < 0) {
+		if ((conn->inputLength = socketReadLine2(conn->client, conn->input, sizeof (conn->input), 1)) < 0) {
 			syslog(LOG_ERR, LOG_FMT "client read error: %s (%d)%c", LOG_ARG, strerror(errno), errno, conn->inputLength == SOCKET_EOF ? '!' : ' ');
 			goto error1;
 		}
@@ -700,9 +695,6 @@ roundhouse(ServerSession *session)
 		/* Add back the CRLF removed by socketReadLine(). */
 		if (sizeof (conn->input) <= conn->inputLength+3)
 			conn->inputLength = sizeof (conn->input)-3;
-		conn->input[conn->inputLength++] = '\r';
-		conn->input[conn->inputLength++] = '\n';
-		conn->input[conn->inputLength] = '\0';
 
 		for (i = 0; i < nservers; i++) {
 			if (conn->servers[i] == NULL)
