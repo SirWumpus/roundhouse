@@ -732,28 +732,6 @@ roundhouse(ServerSession *session)
 		if (conn->connected <= 0)
 			goto error1;
 
-#ifdef HMMM
-/* Does not handle multiline replies, in particular EHLO. */
-		/* When there is more than one SMTP server, we want to
-		 * forward as much the of the client's connection to all
-		 * the servers, so we keep telling the client 250.
-		 *
-		 * When there is only one SMTP server remaining, then we
-		 * can forward the server's response to the client.
-		 */
-		if (conn->connected == 1) {
-			length = strlen(conn->reply);
-			if (sizeof (conn->reply) <= length+3)
-				length = sizeof (conn->reply)-3;
-			conn->reply[length++] = '\r';
-			conn->reply[length++] = '\n';
-			conn->reply[length] = '\0';
-
-			smtpConnPrint(conn, -1, (const char *) conn->reply);
-		}
-
-		else
-#endif
 		if (isEhlo) {
 			/* We have to feed a reasonable EHLO response,
 			 * because some mail clients will abort if
