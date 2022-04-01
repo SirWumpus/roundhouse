@@ -11,6 +11,13 @@ is no set schedule for releases.
    +	Consider adding SASL and man-in-middle support for AUTH
 	DIGEST-MD5 and possibly other mechanisms.
 
+--0.9.0--
+
+   !	Add Return-Path: and Received: header to message.
+
+   !	Update smtpConnGetResponse() to collect multiline replies.
+
+   !	Only send XCLIENT if an EHLO reply indicates support for it.
 
 --0.8.3--
 
