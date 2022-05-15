@@ -505,7 +505,8 @@ smtpConnData(Connection *conn)
 
 	/* Relay client's message to each SMTP server in turn. */
 	for (isDot = 0; !isDot && socketHasInput(conn->client, socket_timeout); ) {
-		if ((length = socketReadLine2(conn->client, conn->input, sizeof (conn->input), 1)) < 0) {
+		/* Read the next line trimming the CRLF. */
+		if ((length = socketReadLine2(conn->client, conn->input, sizeof (conn->input), 0)) < 0) {
 			syslog(LOG_ERR, LOG_FMT "client read error during message: %s (%d)%c", LOG_ARG, strerror(errno), errno, length == SOCKET_EOF ? '!' : ' ');
 			return -1;
 		}
@@ -527,6 +528,11 @@ smtpConnData(Connection *conn)
 		if (2 < debug || (1 < debug && !isEOH) || (0 < debug && isDot)) {
 			syslog(LOG_DEBUG, LOG_FMT "> %s", LOG_ARG, conn->input);
 		}
+
+		/* Add back the CRLF removed by socketReadLine2(). */
+		conn->input[length++] = '\r';
+		conn->input[length++] = '\n';
+		conn->input[length] = '\0';
 
 		for (i = 0; i < nservers; i++) {
 			if (conn->servers[i] == NULL)
