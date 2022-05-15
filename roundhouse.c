@@ -146,7 +146,7 @@ typedef struct {
 	char reply[SMTP_REPLY_LINE_LENGTH*5+1];
 	char client_addr[IPV6_STRING_SIZE];
 	char client_name[DOMAIN_SIZE];
-	char mail[SMTP_PATH_LENGTH+3];
+	ParsePath *mail;
 } Connection;
 
 typedef struct {
@@ -342,6 +342,7 @@ smtpConnDisconnect(Connection *conn, int index)
 		socketClose(conn->servers[index]);
 		conn->servers[index] = NULL;
 		conn->connected--;
+		free(conn->mail);
 	}
 }
 
@@ -486,8 +487,8 @@ smtpConnData(Connection *conn)
 	 */
 	(void) snprintf(
 		line, sizeof (line),
-		"Return-Path:%s\r\nReceived: from %s ([%s])\r\n\tid %s; %s\r\n",
-		conn->mail, conn->client_name, conn->client_addr, conn->id, stamp
+		"Return-Path: <%s>\r\nReceived: from %s ([%s]) id %s; %s\r\n",
+		conn->mail->address.string, conn->client_name, conn->client_addr, conn->id, stamp
 	);
 	if (1 < debug) {
 		syslog(LOG_DEBUG, LOG_FMT "> %s", LOG_ARG, line);
@@ -553,7 +554,6 @@ smtpConnData(Connection *conn)
 int
 roundhouse(ServerSession *session)
 {
-	long length;
 	Connection *conn;
 	char xclient[SMTP_TEXT_LINE_LENGTH];
 	int i, code, isQuit, isData, isEhlo;
@@ -670,7 +670,13 @@ roundhouse(ServerSession *session)
 
 		i = TextInsensitiveStartsWith(conn->input, "MAIL FROM:");
 		if (0 < i) {
-			(void) strncpy(conn->mail, conn->input+i, sizeof (conn->mail));
+			free(conn->mail);
+			conn->mail = NULL;
+			const char *error = parsePath(conn->input, 0, 0, &conn->mail);
+			if (error != NULL) {
+				syslog(LOG_ERROR, "%s", error);
+				continue;
+			}
 		}
 
 		isEhlo = 0 < TextInsensitiveStartsWith(conn->input, "EHLO");
