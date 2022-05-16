@@ -2,7 +2,7 @@
 #	Thus it begins...
 #######################################################################
 
-AC_INIT(roundhouse, 0.9, [Anthony Howe <achowe@snert.com>])
+AC_INIT(roundhouse, 0.10, [Anthony Howe <achowe@snert.com>])
 
 dnl The autoconf version I learned to deal with.
 AC_PREREQ(2.57)
